@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>CarVault</title>
+
+    <!-- Supabase JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 30px;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f5f5f5;
+            color: #111;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1100px;
+            margin: auto;
+        }
+
+        /* ==============================
+           HEADER
+        ============================== */
+
+        h1 {
+            margin: 0;
+            font-size: 36px;
+        }
+
+        .subtitle {
+            margin-top: 8px;
+            color: #666;
+        }
+
+        /* ==============================
+           UPLOAD SECTION
+        ============================== */
+
+        .upload-box {
+            background: white;
+            padding: 25px;
+            margin-top: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        .upload-box h2 {
+            margin-top: 0;
+        }
+
+        label {
+            display: block;
+            margin-top: 16px;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 7px;
+            font-size: 15px;
+            font-family: inherit;
+        }
+
+        textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        input[type="file"] {
+            background: white;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 13px 22px;
+            border: none;
+            border-radius: 7px;
+            background: #111;
+            color: white;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #333;
+        }
+
+        button:disabled {
+            background: #888;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        /* ==============================
+           UPLOADED CARS
+        ============================== */
+
+        .cars-section {
+            margin-top: 45px;
+        }
+
+        .cars-section h2 {
+            margin-bottom: 20px;
+        }
+
+        .cars-grid {
+            display: grid;
+            grid-template-columns:
+                repeat(auto-fit, minmax(280px, 1fr));
+
+            gap: 22px;
+        }
+
+        .car-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        .car-card img {
+            width: 100%;
+            height: 230px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .car-info {
+            padding: 18px;
+        }
+
+        .car-info h3 {
+            margin: 0 0 12px;
+            font-size: 21px;
+        }
+
+        .car-info p {
+            margin: 7px 0;
+            color: #555;
+        }
+
+        .car-info .about {
+            margin-top: 15px;
+            color: #222;
+            line-height: 1.5;
+        }
+
+        .loading,
+        .empty {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            color: #666;
+        }
+
+        /* ==============================
+           MOBILE
+        ============================== */
+
+        @media (max-width: 600px) {
+
+            body {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 30px;
+            }
+
+            .upload-box {
+                padding: 18px;
+            }
+
+            .car-card img {
+                height: 210px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- =====================================
+         HEADER
+    ====================================== -->
+
+    <h1>CarVault</h1>
+
+    <p class="subtitle">
+        Car Photo Upload & Community Database
+    </p>
+
+
+    <!-- =====================================
+         UPLOAD FORM
+    ====================================== -->
+
+    <div class="upload-box">
+
+        <h2>Upload Your Car</h2>
+
+        <form id="carForm">
+
+            <!-- Brand -->
+
+            <label for="brand">
+                Car Brand
+            </label>
+
+            <input
+                type="text"
+                id="brand"
+                placeholder="e.g. BMW"
+                required
+            >
+
+
+            <!-- Model -->
+
+            <label for="model">
+                Car Model
+            </label>
+
+            <input
+                type="text"
+                id="model"
+                placeholder="e.g. M340i"
+                required
+            >
+
+
+            <!-- Year -->
+
+            <label for="year">
+                Year
+            </label>
+
+            <input
+                type="number"
+                id="year"
+                placeholder="e.g. 2020"
+                min="1900"
+                max="2100"
+            >
+
+
+            <!-- Owner -->
+
+            <label for="owner">
+                Owner / Username
+            </label>
+
+            <input
+                type="text"
+                id="owner"
+                placeholder="e.g. Abhi"
+            >
+
+
+            <!-- About -->
+
+            <label for="about">
+                About the car
+            </label>
+
+            <textarea
+                id="about"
+                placeholder="Tell us about this car..."
+            ></textarea>
+
+
+            <!-- Photo -->
+
+            <label for="photo">
+                Car Photo
+            </label>
+
+            <input
+                type="file"
+                id="photo"
+                accept="image/*"
+                required
+            >
+
+
+            <!-- Upload -->
+
+            <button
+                type="submit"
+                id="uploadButton"
+            >
+                Upload Car
+            </button>
+
+
+            <!-- Status -->
+
+            <div id="status"></div>
+
+        </form>
+
+    </div>
+
+
+    <!-- =====================================
+         UPLOADED CARS
+    ====================================== -->
+
+    <div class="cars-section">
+
+        <h2>Uploaded Cars</h2>
+
+        <div
+            id="carsList"
+            class="cars-grid"
+        >
+
+            <p class="loading">
+                Loading cars...
+            </p>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+    // ==================================================
+    // SUPABASE CONFIGURATION
+    // ==================================================
+
+    const SUPABASE_URL =
+        "https://aprwjgiewmvxslfthncs.supabase.co";
+
+    const SUPABASE_KEY =
+        "sb_publishable_eTj_kJ1dVI6RUSKjCPIp4g_8Tt9VjwA";
+
+
+    // ==================================================
+    // CREATE SUPABASE CLIENT
+    // ==================================================
+
+    const supabaseClient =
+        supabase.createClient(
+            SUPABASE_URL,
+            SUPABASE_KEY
+        );
+
+
+    // ==================================================
+    // GET HTML ELEMENTS
+    // ==================================================
+
+    const form =
+        document.getElementById("carForm");
+
+    const uploadButton =
+        document.getElementById("uploadButton");
+
+    const status =
+        document.getElementById("status");
+
+    const carsList =
+        document.getElementById("carsList");
+
+
+    // ==================================================
+    // ESCAPE HTML
+    // Protects the page from unsafe user text
+    // ==================================================
+
+    function escapeHTML(value) {
+
+        if (
+            value === null ||
+            value === undefined
+        ) {
+            return "";
+        }
+
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+
+    // ==================================================
+    // LOAD UPLOADED CARS
+    // ==================================================
+
+    async function loadCars() {
+
+        carsList.innerHTML =
+            '<p class="loading">Loading cars...</p>';
+
+        try {
+
+            console.log(
+                "Loading cars from Supabase..."
+            );
+
+
+            const {
+                data: cars,
+                error
+            } =
+                await supabaseClient
+                    .from("cars")
+                    .select("*")
+                    .order(
+                        "created_at",
+                        {
+                            ascending: false
+                        }
+                    );
+
+
+            // ------------------------------------------
+            // CHECK DATABASE ERROR
+            // ------------------------------------------
+
+            if (error) {
+
+                console.error(
+                    "Supabase cars error:",
+                    error
+                );
+
+                throw error;
+            }
+
+
+            console.log(
+                "Cars loaded:",
+                cars
+            );
+
+
+            // ------------------------------------------
+            // NO CARS
+            // ------------------------------------------
+
+            if (
+                !cars ||
+                cars.length === 0
+            ) {
+
+                carsList.innerHTML =
+                    `
+                    <div class="empty">
+                        No cars uploaded yet.
+                    </div>
+                    `;
+
+                return;
+            }
+
+
+            // ------------------------------------------
+            // CLEAR LOADING MESSAGE
+            // ------------------------------------------
+
+            carsList.innerHTML = "";
+
+
+            // ------------------------------------------
+            // CREATE CAR CARDS
+            // ------------------------------------------
+
+            cars.forEach(car => {
+
+                const card =
+                    document.createElement("div");
+
+                card.className =
+                    "car-card";
+
+
+                card.innerHTML = `
+
+                    <img
+                        src="${escapeHTML(
+                            car.image_url
+                        )}"
+                        alt="${escapeHTML(
+                            car.brand
+                        )} ${escapeHTML(
+                            car.model
+                        )}"
+                        loading="lazy"
+                    >
+
+                    <div class="car-info">
+
+                        <h3>
+                            ${escapeHTML(
+                                car.brand
+                            )}
+                            ${escapeHTML(
+                                car.model
+                            )}
+                        </h3>
+
+                        <p>
+                            <strong>
+                                Year:
+                            </strong>
+
+                            ${
+                                car.year ||
+                                "N/A"
+                            }
+                        </p>
+
+                        <p>
+                            <strong>
+                                Owner:
+                            </strong>
+
+                            ${
+                                escapeHTML(
+                                    car.owner ||
+                                    "Anonymous"
+                                )
+                            }
+                        </p>
+
+                        ${
+                            car.about
+                            ?
+                            `
+                            <p class="about">
+                                ${escapeHTML(
+                                    car.about
+                                )}
+                            </p>
+                            `
+                            :
+                            ""
+                        }
+
+                    </div>
+
+                `;
+
+
+                carsList.appendChild(card);
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "CarVault loadCars error:",
+                error
+            );
+
+
+            carsList.innerHTML =
+                `
+                <div class="empty">
+
+                    ❌ Could not load uploaded cars.
+
+                    <br><br>
+
+                    <small>
+                        ${escapeHTML(
+                            error.message ||
+                            "Unknown error"
+                        )}
+                    </small>
+
+                </div>
+                `;
+        }
+    }
+
+
+    // ==================================================
+    // UPLOAD CAR
+    // ==================================================
+
+    form.addEventListener(
+        "submit",
+        async function(event) {
+
+            event.preventDefault();
+
+
+            // ------------------------------------------
+            // GET FORM VALUES
+            // ------------------------------------------
+
+            const brand =
+                document
+                    .getElementById("brand")
+                    .value
+                    .trim();
+
+            const model =
+                document
+                    .getElementById("model")
+                    .value
+                    .trim();
+
+            const year =
+                document
+                    .getElementById("year")
+                    .value;
+
+            const owner =
+                document
+                    .getElementById("owner")
+                    .value
+                    .trim();
+
+            const about =
+                document
+                    .getElementById("about")
+                    .value
+                    .trim();
+
+            const photo =
+                document
+                    .getElementById("photo")
+                    .files[0];
+
+
+            // ------------------------------------------
+            // VALIDATE
+            // ------------------------------------------
+
+            if (
+                !brand ||
+                !model ||
+                !photo
+            ) {
+
+                status.innerHTML =
+                    "❌ Please fill in the required fields.";
+
+                return;
+            }
+
+
+            // ------------------------------------------
+            // DISABLE BUTTON
+            // ------------------------------------------
+
+            uploadButton.disabled =
+                true;
+
+            uploadButton.textContent =
+                "Uploading...";
+
+            status.innerHTML =
+                "Uploading your car...";
+
+
+            try {
+
+                // ======================================
+                // CREATE UNIQUE FILE NAME
+                // ======================================
+
+                const extension =
+                    photo.name
+                        .split(".")
+                        .pop()
+                        .toLowerCase();
+
+
+                const uniqueName =
+                    Date.now() +
+                    "-" +
+                    Math.random()
+                        .toString(36)
+                        .substring(2, 10);
+
+
+                const fileName =
+                    uniqueName +
+                    "." +
+                    extension;
+
+
+                // ======================================
+                // UPLOAD PHOTO
+                // ======================================
+
+                const {
+                    error: uploadError
+                } =
+                    await supabaseClient
+                        .storage
+                        .from("carvault")
+                        .upload(
+                            fileName,
+                            photo,
+                            {
+                                contentType:
+                                    photo.type,
+
+                                upsert:
+                                    false
+                            }
+                        );
+
+
+                if (uploadError) {
+
+                    throw uploadError;
+                }
+
+
+                // ======================================
+                // GET PUBLIC PHOTO URL
+                // ======================================
+
+                const {
+                    data: publicURLData
+                } =
+                    supabaseClient
+                        .storage
+                        .from("carvault")
+                        .getPublicUrl(
+                            fileName
+                        );
+
+
+                const imageURL =
+                    publicURLData.publicUrl;
+
+
+                // ======================================
+                // SAVE CAR INFORMATION
+                // ======================================
+
+                const {
+                    error: databaseError
+                } =
+                    await supabaseClient
+                        .from("cars")
+                        .insert([
+                            {
+                                brand:
+                                    brand,
+
+                                model:
+                                    model,
+
+                                year:
+                                    year
+                                    ? Number(year)
+                                    : null,
+
+                                owner:
+                                    owner,
+
+                                about:
+                                    about,
+
+                                image_url:
+                                    imageURL
+                            }
+                        ]);
+
+
+                if (databaseError) {
+
+                    throw databaseError;
+                }
+
+
+                // ======================================
+                // SUCCESS
+                // ======================================
+
+                status.innerHTML =
+                    "✅ Car uploaded successfully!";
+
+
+                // Reset form
+
+                form.reset();
+
+
+                // ======================================
+                // REFRESH CAR LIST
+                // ======================================
+
+                await loadCars();
+
+            }
+
+            catch (error) {
+
+                console.error(
+                    "CarVault upload error:",
+                    error
+                );
+
+
+                status.innerHTML =
+                    "❌ Upload failed: " +
+                    escapeHTML(
+                        error.message ||
+                        "Unknown error"
+                    );
+
+            }
+
+            finally {
+
+                uploadButton.disabled =
+                    false;
+
+                uploadButton.textContent =
+                    "Upload Car";
+
+            }
+
+        }
+    );
+
+
+    // ==================================================
+    // LOAD CARS WHEN PAGE OPENS
+    // ==================================================
+
+    loadCars();
+
+</script>
+
+</body>
+</html>
