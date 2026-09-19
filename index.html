@@ -1,865 +1,2253 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05060A">
+<title>CarVault — AI-verified car showcase</title>
 
-    <title>CarVault</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 
-    <!-- Supabase JavaScript -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
 
-    <style>
-        * {
-            box-sizing: border-box;
-        }
+<style>
+/* ==========================================================
+   CARVAULT — "garage at night"
+   ========================================================== */
 
-        body {
-            margin: 0;
-            padding: 30px;
-            font-family: Arial, Helvetica, sans-serif;
-            background: #f5f5f5;
-            color: #111;
-        }
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-        .container {
-            width: 100%;
-            max-width: 1100px;
-            margin: auto;
-        }
+:root{
+  --ink:        #05060a;
+  --ink-2:      #080a11;
+  --panel:      #0d1016;
+  --panel-2:    #12161f;
+  --stroke:     rgba(255,255,255,.07);
+  --stroke-2:   rgba(255,255,255,.13);
 
-        /* ==============================
-           HEADER
-        ============================== */
+  --paint:      #e9edf5;
+  --muted:      #7f8aa0;
+  --faint:      #59637a;
 
-        h1 {
-            margin: 0;
-            font-size: 36px;
-        }
+  --xenon:      #38e1ff;
+  --tail:       #ff2f6d;
+  --amber:      #ffb020;
+  --green:      #3be58b;
 
-        .subtitle {
-            margin-top: 8px;
-            color: #666;
-        }
+  --beam: linear-gradient(90deg, var(--xenon) 0%, #7c8cff 45%, var(--tail) 100%);
 
-        /* ==============================
-           UPLOAD SECTION
-        ============================== */
+  --r-md: 16px;
+  --r-lg: 22px;
 
-        .upload-box {
-            background: white;
-            padding: 25px;
-            margin-top: 30px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-        }
+  --ease: cubic-bezier(.22,.61,.36,1);
+  --pop:  cubic-bezier(.34,1.3,.64,1);
 
-        .upload-box h2 {
-            margin-top: 0;
-        }
+  --shell: min(1280px, 100%);
+  --gut: clamp(16px, 4vw, 48px);
 
-        label {
-            display: block;
-            margin-top: 16px;
-            margin-bottom: 6px;
-            font-weight: bold;
-        }
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
 
-        input,
-        textarea {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ccc;
-            border-radius: 7px;
-            font-size: 15px;
-            font-family: inherit;
-        }
+html{ scroll-behavior: smooth; scroll-padding-top: calc(86px + env(safe-area-inset-top, 0px)); -webkit-text-size-adjust: 100%; }
 
-        textarea {
-            min-height: 110px;
-            resize: vertical;
-        }
+body{
+  background: var(--ink);
+  color: var(--paint);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  line-height: 1.55;
+  min-height: 100%;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
 
-        input[type="file"] {
-            background: white;
-        }
+body::before{
+  content:''; position: fixed; inset: -20%; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(60% 45% at 12% 0%,  rgba(56,225,255,.10), transparent 60%),
+    radial-gradient(50% 40% at 92% 12%, rgba(255,47,109,.09), transparent 62%),
+    radial-gradient(70% 50% at 50% 106%, rgba(124,140,255,.08), transparent 60%);
+  filter: blur(10px);
+  animation: drift 26s var(--ease) infinite alternate;
+}
+@keyframes drift{
+  0%   { transform: translate3d(0,0,0) scale(1); }
+  100% { transform: translate3d(-2.5%, 2%, 0) scale(1.08); }
+}
+body::after{
+  content:''; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+}
 
-        button {
-            margin-top: 20px;
-            padding: 13px 22px;
-            border: none;
-            border-radius: 7px;
-            background: #111;
-            color: white;
-            font-size: 15px;
-            cursor: pointer;
-        }
+::selection{ background: rgba(56,225,255,.25); color: #fff; }
+:focus-visible{ outline: 2px solid var(--xenon); outline-offset: 3px; border-radius: 6px; }
 
-        button:hover {
-            background: #333;
-        }
+::-webkit-scrollbar{ width: 10px; height: 10px; }
+::-webkit-scrollbar-track{ background: var(--ink-2); }
+::-webkit-scrollbar-thumb{ background: #1d2330; border-radius: 20px; border: 3px solid var(--ink-2); }
+::-webkit-scrollbar-thumb:hover{ background: #2a3242; }
 
-        button:disabled {
-            background: #888;
-            cursor: not-allowed;
-        }
+.mono{ font-family:'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.shell{ width: var(--shell); margin-inline: auto; padding-inline: var(--gut); position: relative; z-index: 1; }
 
-        #status {
-            margin-top: 15px;
-            font-weight: bold;
-        }
+/* ==========================================================
+   1 · IGNITION SCREEN
+   ========================================================== */
+.ignition{
+  position: fixed; inset: 0; z-index: 900;
+  background: radial-gradient(70% 60% at 50% 45%, #0a0e16 0%, #05060a 70%);
+  display: grid; place-items: center;
+  transition: opacity .9s var(--ease), visibility .9s;
+}
+.ignition.done{ opacity: 0; visibility: hidden; pointer-events: none; }
+.ignition-inner{ display: grid; justify-items: center; gap: 24px; padding: 24px; text-align: center; }
 
-        /* ==============================
-           UPLOADED CARS
-        ============================== */
+.tach{ width: min(270px, 60vw); aspect-ratio: 1; position: relative; }
+.tach svg{ width: 100%; height: 100%; transform: rotate(135deg); overflow: visible; }
+.tach-track{ fill: none; stroke: rgba(255,255,255,.07); stroke-width: 6; stroke-linecap: round; }
+.tach-fill{
+  fill: none; stroke: url(#beamGrad); stroke-width: 6; stroke-linecap: round;
+  filter: drop-shadow(0 0 10px rgba(56,225,255,.55));
+}
+.tach-ticks line{ stroke: rgba(255,255,255,.18); stroke-width: 2; stroke-linecap: round; }
+.tach-readout{ position: absolute; inset: 0; display: grid; place-content: center; gap: 2px; }
+.tach-readout .num{ font-family:'Archivo'; font-weight: 800; font-size: clamp(2.6rem, 9vw, 3.4rem); letter-spacing: -.04em; }
+.tach-readout .lbl{ font-size: .66rem; letter-spacing: .32em; color: var(--faint); text-indent: .32em; }
 
-        .cars-section {
-            margin-top: 45px;
-        }
+.ignition-word{
+  font-family:'Archivo'; font-weight: 900; letter-spacing: -.05em;
+  font-size: clamp(2.1rem, 8vw, 3.2rem); display: flex; overflow: hidden;
+}
+.ignition-word span{ display: inline-block; transform: translateY(105%); animation: letterUp .8s var(--pop) forwards; }
+@keyframes letterUp{ to{ transform: translateY(0); } }
+.ignition-sub{ color: var(--faint); font-size: .92rem; max-width: 34ch; }
+.skip{
+  background: none; border: 1px solid var(--stroke); color: var(--muted);
+  font: inherit; font-size: .82rem; padding: 9px 20px; border-radius: 40px; cursor: pointer;
+  transition: color .3s, border-color .3s, background .3s;
+}
+.skip:hover{ color: var(--paint); border-color: var(--stroke-2); background: rgba(255,255,255,.04); }
 
-        .cars-section h2 {
-            margin-bottom: 20px;
-        }
+/* ==========================================================
+   2 · HEADER
+   ========================================================== */
+.scanline{
+  position: fixed; top: env(safe-area-inset-top, 0px); left: 0; height: 2px; width: 0;
+  background: var(--beam); z-index: 400; box-shadow: 0 0 14px rgba(56,225,255,.6);
+}
 
-        .cars-grid {
-            display: grid;
-            grid-template-columns:
-                repeat(auto-fit, minmax(280px, 1fr));
+.masthead{
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 300;
+  padding-block: 14px;
+  background: rgba(5,6,10,.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid transparent;
+  transition: border-color .4s, background .4s, padding .4s;
+}
+.masthead.stuck{ border-bottom-color: var(--stroke); padding-block: 10px; background: rgba(5,6,10,.9); }
+.masthead-row{ display: flex; align-items: center; gap: 18px; }
 
-            gap: 22px;
-        }
+.wordmark{ display: flex; align-items: center; gap: 11px; text-decoration: none; color: inherit; flex: 0 0 auto; }
+.mark{
+  width: 34px; height: 34px; border-radius: 11px; position: relative; flex: 0 0 auto;
+  background: linear-gradient(150deg, #101620, #070910);
+  border: 1px solid var(--stroke-2); display: grid; place-items: center; overflow: hidden;
+}
+.mark::after{
+  content:''; position: absolute; width: 150%; height: 40%; top: -10%; left: -25%;
+  background: linear-gradient(90deg, transparent, rgba(56,225,255,.5), transparent);
+  transform: rotate(-24deg); animation: sheen 5s var(--ease) infinite;
+}
+@keyframes sheen{ 0%,70%{ transform: translateY(-140%) rotate(-24deg);} 88%,100%{ transform: translateY(420%) rotate(-24deg);} }
+.mark svg{ width: 19px; height: 19px; position: relative; z-index: 2; }
+.wordmark b{ font-family:'Archivo'; font-weight: 800; font-size: 1.12rem; letter-spacing: -.035em; }
+.wordmark i{ font-style: normal; color: var(--faint); font-size: .66rem; letter-spacing: .2em; display: block; margin-top: -3px; }
 
-        .car-card {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-        }
+.nav{ display: flex; gap: 4px; margin-left: auto; }
+.nav a{
+  color: var(--muted); text-decoration: none; font-size: .88rem; font-weight: 500;
+  padding: 9px 15px; border-radius: 40px; transition: color .25s, background .25s;
+}
+.nav a:hover{ color: var(--paint); background: rgba(255,255,255,.05); }
+.nav a.on{ color: var(--xenon); }
 
-        .car-card img {
-            width: 100%;
-            height: 230px;
-            object-fit: cover;
-            display: block;
-        }
+.btn{
+  font: inherit; font-weight: 600; font-size: .9rem; cursor: pointer; text-decoration: none;
+  border-radius: 40px; padding: 12px 22px; border: 1px solid transparent;
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  transition: transform .3s var(--pop), box-shadow .3s, background .3s, border-color .3s, color .3s;
+  position: relative; overflow: hidden; white-space: nowrap;
+}
+.btn:active{ transform: scale(.97); }
+.btn-primary{
+  color: #03060b;
+  background: linear-gradient(135deg, #8df3ff, var(--xenon) 40%, #7c8cff 100%);
+  box-shadow: 0 10px 30px -12px rgba(56,225,255,.75), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.btn-primary:hover{ transform: translateY(-2px); box-shadow: 0 18px 38px -12px rgba(56,225,255,.85), inset 0 1px 0 rgba(255,255,255,.6); }
+.btn-primary::after{
+  content:''; position: absolute; inset: 0; transform: translateX(-120%);
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+  transition: transform .7s var(--ease);
+}
+.btn-primary:hover::after{ transform: translateX(120%); }
+.btn-ghost{ background: rgba(255,255,255,.04); border-color: var(--stroke-2); color: var(--paint); }
+.btn-ghost:hover{ background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.22); transform: translateY(-2px); }
+.btn .ic{ width: 17px; height: 17px; display: block; }
+.masthead .btn{ padding: 11px 18px; }
 
-        .car-info {
-            padding: 18px;
-        }
+/* ==========================================================
+   3 · HERO
+   ========================================================== */
+.hero{ position: relative; padding-top: clamp(44px, 8vw, 92px); padding-bottom: clamp(36px, 6vw, 70px); overflow: hidden; }
+.hero-grid{ display: grid; gap: clamp(30px, 5vw, 56px); grid-template-columns: minmax(0,1.15fr) minmax(0,.85fr); align-items: end; }
+@media (max-width: 900px){ .hero-grid{ grid-template-columns: 1fr; align-items: start; } }
 
-        .car-info h3 {
-            margin: 0 0 12px;
-            font-size: 21px;
-        }
+.pill{
+  display: inline-flex; align-items: center; gap: 9px; padding: 7px 15px 7px 11px;
+  border: 1px solid rgba(56,225,255,.28); border-radius: 40px;
+  background: rgba(56,225,255,.06); color: #a9ecff; font-size: .8rem; font-weight: 500;
+  margin-bottom: 22px;
+}
+.led{ width: 7px; height: 7px; border-radius: 50%; background: var(--xenon); box-shadow: 0 0 10px var(--xenon); animation: led 1.6s ease-in-out infinite; flex: 0 0 auto; }
+@keyframes led{ 0%,100%{ opacity:1; transform: scale(1);} 50%{ opacity:.35; transform: scale(.75);} }
 
-        .car-info p {
-            margin: 7px 0;
-            color: #555;
-        }
+h1.hero-title{
+  font-family:'Archivo'; font-weight: 800; letter-spacing: -.045em; line-height: .94;
+  font-size: clamp(2.6rem, 7.2vw, 5.2rem);
+}
+.hero-title .line{ display: block; overflow: hidden; }
+.hero-title .line > span{ display: block; transform: translateY(105%); }
+.lit .hero-title .line > span{ animation: letterUp 1s var(--ease) forwards; }
+.lit .hero-title .line:nth-child(2) > span{ animation-delay: .09s; }
+.lit .hero-title .line:nth-child(3) > span{ animation-delay: .18s; }
+.hero-title em{
+  font-style: normal;
+  background: linear-gradient(100deg, #fff 0%, #8df3ff 38%, #ff7aa8 78%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.hero-copy{ color: var(--muted); font-size: clamp(1rem, 1.6vw, 1.1rem); font-weight: 300; max-width: 52ch; margin-top: 22px; }
+.hero-copy b{ color: var(--paint); font-weight: 500; }
+.hero-cta{ display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
 
-        .car-info .about {
-            margin-top: 15px;
-            color: #222;
-            line-height: 1.5;
-        }
+.cluster{
+  border: 1px solid var(--stroke); border-radius: var(--r-lg);
+  background: linear-gradient(170deg, rgba(255,255,255,.045), rgba(255,255,255,.012));
+  padding: 6px; position: relative; overflow: hidden;
+}
+.cluster::before{
+  content:''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: linear-gradient(140deg, rgba(56,225,255,.4), transparent 42%, rgba(255,47,109,.34));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+}
+.cluster-inner{ background: rgba(5,7,12,.7); border-radius: 18px; padding: clamp(18px, 3vw, 26px); }
+.gauges{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.gauge{ text-align: center; padding: 10px 4px; position: relative; }
+.gauge + .gauge::before{ content:''; position: absolute; left: 0; top: 18%; bottom: 18%; width: 1px; background: var(--stroke); }
+.gauge .val{ font-family:'Archivo'; font-weight: 800; font-size: clamp(1.6rem, 4.6vw, 2.2rem); letter-spacing: -.04em; }
+.gauge .cap{ font-size: .7rem; color: var(--faint); letter-spacing: .1em; margin-top: 2px; }
+.gauge:nth-child(1) .val{ color: var(--xenon); }
+.gauge:nth-child(3) .val{ color: var(--tail); }
+.cluster-note{ margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--stroke); font-size: .84rem; color: var(--muted); display: flex; gap: 10px; align-items: flex-start; }
+.cluster-note svg{ flex: 0 0 auto; margin-top: 3px; }
 
-        .loading,
-        .empty {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            color: #666;
-        }
+.trails{
+  position: relative; height: 86px; margin-top: clamp(30px, 5vw, 54px); overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+.trail{ position: absolute; height: 2px; border-radius: 40px; opacity: 0; animation: streak 4.6s linear infinite; }
+@keyframes streak{
+  0%   { transform: translateX(-30vw) scaleX(.2); opacity: 0; }
+  12%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateX(120vw) scaleX(1); opacity: 0; }
+}
+.trails::after{ content:''; position: absolute; inset: auto 0 0 0; height: 1px; background: var(--stroke); }
 
-        /* ==============================
-           MOBILE
-        ============================== */
+/* ==========================================================
+   4 · CONTROL BAR
+   ========================================================== */
+.section-head{ display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; margin-bottom: 20px; }
+.section-head h2{ font-family:'Archivo'; font-weight: 800; font-size: clamp(1.5rem, 3.6vw, 2.1rem); letter-spacing: -.035em; }
+.section-head p{ color: var(--faint); font-size: .9rem; margin-top: 4px; }
 
-        @media (max-width: 600px) {
+.controls{
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  padding: 10px; border: 1px solid var(--stroke); border-radius: var(--r-lg);
+  background: rgba(255,255,255,.025); margin-bottom: 26px; backdrop-filter: blur(10px);
+}
+.search{ position: relative; flex: 1 1 240px; min-width: 0; }
+.search svg{ position: absolute; left: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.search input{ padding-left: 40px; }
 
-            body {
-                padding: 15px;
-            }
+input, textarea, select{
+  width: 100%; padding: 12px 15px; color: var(--paint); font: inherit; font-size: .94rem;
+  background: rgba(5,7,12,.75); border: 1px solid var(--stroke); border-radius: 12px;
+  outline: none; transition: border-color .25s, box-shadow .25s, background .25s;
+}
+input::placeholder, textarea::placeholder{ color: #4c5566; }
+input:focus, textarea:focus, select:focus{ border-color: rgba(56,225,255,.55); box-shadow: 0 0 0 4px rgba(56,225,255,.12); background: rgba(8,11,18,.9); }
+select{
+  cursor: pointer; appearance: none; -webkit-appearance: none; padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237f8aa0' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center;
+}
+select option{ background: #0d1016; color: var(--paint); }
+.controls select{ flex: 0 0 auto; width: auto; }
 
-            h1 {
-                font-size: 30px;
-            }
+.seg{ display: flex; gap: 3px; padding: 3px; background: rgba(5,7,12,.75); border: 1px solid var(--stroke); border-radius: 12px; flex: 0 0 auto; }
+.seg button{
+  font: inherit; font-size: .84rem; font-weight: 500; color: var(--muted); background: none; border: 0;
+  padding: 8px 14px; border-radius: 9px; cursor: pointer; transition: color .25s, background .25s;
+}
+.seg button.on{ color: #03060b; background: linear-gradient(135deg, #8df3ff, var(--xenon)); font-weight: 600; }
+.seg button:not(.on):hover{ color: var(--paint); background: rgba(255,255,255,.05); }
 
-            .upload-box {
-                padding: 18px;
-            }
+/* ==========================================================
+   5 · CAR CARDS
+   ========================================================== */
+.fleet{ display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: clamp(16px, 2.4vw, 26px); }
+.fleet.list{ grid-template-columns: 1fr; }
 
-            .car-card img {
-                height: 210px;
-            }
-        }
-    </style>
+.car{
+  position: relative; border-radius: var(--r-lg); overflow: hidden;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--stroke);
+  transition: transform .5s var(--ease), border-color .4s, box-shadow .5s, opacity .6s var(--ease);
+  opacity: 0; transform: translateY(26px);
+}
+.car.in{ opacity: 1; transform: translateY(0); }
+.car::before{
+  content:''; position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .45s;
+  background: radial-gradient(320px circle at var(--mx, 50%) var(--my, 0%), rgba(56,225,255,.16), transparent 62%);
+}
+.car:hover::before{ opacity: 1; }
+.car:hover{ transform: translateY(-6px); border-color: rgba(56,225,255,.28); box-shadow: 0 30px 60px -28px rgba(0,0,0,.95), 0 0 0 1px rgba(56,225,255,.12); }
+
+.fleet.list .car{ display: grid; grid-template-columns: minmax(200px, 330px) 1fr; }
+@media (max-width: 720px){ .fleet.list .car{ grid-template-columns: 1fr; } }
+
+.stage{ position: relative; aspect-ratio: 16/10; background: #06080d; overflow: hidden; cursor: zoom-in; }
+.fleet.list .stage{ aspect-ratio: auto; min-height: 210px; }
+.frame{ position: absolute; inset: 0; opacity: 0; transform: scale(1.06); transition: opacity 1s var(--ease), transform 1.4s var(--ease); }
+.frame.on{ opacity: 1; transform: scale(1); }
+.frame img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+.stage::after{ content:''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(6,8,13,.8) 0%, transparent 46%); pointer-events: none; }
+
+.dots{ position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; gap: 5px; z-index: 4; }
+.dots button{ width: 6px; height: 6px; border: 0; padding: 0; border-radius: 40px; background: rgba(255,255,255,.35); cursor: pointer; transition: all .4s var(--pop); }
+.dots button.on{ width: 20px; background: var(--xenon); box-shadow: 0 0 10px rgba(56,225,255,.8); }
+.arrow{
+  position: absolute; top: 50%; transform: translateY(-50%) scale(.85); z-index: 4;
+  width: 34px; height: 34px; border-radius: 50%; cursor: pointer; opacity: 0;
+  background: rgba(6,8,13,.7); border: 1px solid var(--stroke-2); color: #fff;
+  backdrop-filter: blur(8px); display: grid; place-items: center; font-size: 1rem; font-family: inherit;
+  transition: opacity .3s, transform .3s var(--pop), background .3s;
+}
+.car:hover .arrow{ opacity: 1; transform: translateY(-50%) scale(1); }
+.arrow:hover{ background: rgba(56,225,255,.35); }
+.arrow.p{ left: 10px; } .arrow.n{ right: 10px; }
+.bar{ position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: var(--beam); z-index: 5; box-shadow: 0 0 8px rgba(56,225,255,.7); }
+
+.tag{
+  position: absolute; z-index: 6; display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 40px; font-size: .74rem; font-weight: 600;
+  background: rgba(6,8,13,.78); backdrop-filter: blur(8px); border: 1px solid var(--stroke-2);
+}
+.tag.count{ top: 12px; right: 12px; color: var(--paint); }
+.tag.hold{ top: 12px; left: 12px; color: var(--amber); border-color: rgba(255,176,32,.4); background: rgba(48,33,7,.85); }
+.tag.hold .led{ background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+
+.scrap{
+  position: absolute; top: 12px; left: 12px; z-index: 7; width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer; font-family: inherit;
+  background: rgba(196,18,75,.9); border: 1px solid rgba(255,47,109,.5); color: #fff;
+  opacity: 0; transform: scale(.8); transition: all .3s var(--pop);
+}
+.car:hover .scrap{ opacity: 1; transform: scale(1); }
+.scrap:hover{ background: var(--tail); transform: scale(1.1) rotate(8deg); }
+.hold-timer{
+  position: absolute; top: 15px; left: 54px; z-index: 7; font-size: .72rem; font-weight: 600;
+  padding: 5px 10px; border-radius: 40px; color: var(--amber);
+  background: rgba(6,8,13,.8); border: 1px solid rgba(255,176,32,.3); pointer-events: none;
+}
+
+.plate{ padding: 18px; display: grid; gap: 12px; align-content: start; }
+.plate-top{ display: flex; align-items: baseline; gap: 10px; justify-content: space-between; }
+.plate h3{ font-family:'Archivo'; font-weight: 700; font-size: 1.22rem; letter-spacing: -.025em; line-height: 1.15; }
+.plate h3 span{ color: var(--faint); font-weight: 500; }
+.yr{ font-size: .78rem; color: var(--xenon); border: 1px solid rgba(56,225,255,.25); background: rgba(56,225,255,.07); padding: 3px 9px; border-radius: 7px; flex: 0 0 auto; }
+.owner{ display: flex; align-items: center; gap: 9px; font-size: .86rem; color: var(--muted); }
+.avatar{
+  width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto;
+  font-size: .68rem; font-weight: 700; color: #03060b; font-family:'Archivo';
+  background: linear-gradient(140deg, #8df3ff, #7c8cff);
+}
+.about{ color: #9aa5ba; font-size: .9rem; line-height: 1.6; border-left: 2px solid rgba(56,225,255,.3); padding-left: 12px; }
+
+.spec-row{ display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: .84rem; color: var(--muted); }
+.color-chip{
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 3px 10px; border-radius: 30px;
+  background: rgba(255,255,255,.04); border: 1px solid var(--stroke);
+}
+.color-chip .swatch{ width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); flex: 0 0 auto; }
+.mods{
+  font-size: .86rem; color: #b9c3d4; line-height: 1.55;
+  border-left: 2px solid rgba(255,176,32,.45);
+  background: rgba(255,176,32,.045);
+  padding: 8px 12px; border-radius: 0 8px 8px 0;
+}
+.mods b{ display: block; color: var(--amber); font-weight: 600; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 3px; font-family:'Archivo'; }
+
+/* NEW: engine / variant chip on cards */
+.engine-chip{
+  display: flex; flex-wrap: wrap; gap: 6px 10px;
+  font-size: .82rem; color: var(--muted);
+  padding-top: 2px;
+}
+.engine-chip span {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 20px;
+  background: rgba(56,225,255,.06);
+  border: 1px solid rgba(56,225,255,.18);
+  color: #b8e8ff;
+}
+.engine-chip span::before{ content:'·'; opacity:.6; }
+
+.notice{
+  grid-column: 1/-1; text-align: center; padding: clamp(40px, 8vw, 72px) 24px;
+  border: 1px dashed var(--stroke-2); border-radius: var(--r-lg); color: var(--muted);
+  background: rgba(255,255,255,.015);
+}
+.notice h3{ font-family:'Archivo'; font-weight: 700; font-size: 1.25rem; color: var(--paint); margin-bottom: 8px; letter-spacing: -.02em; }
+.notice p{ font-size: .93rem; max-width: 42ch; margin: 0 auto 20px; }
+
+.skeleton{ border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--stroke); background: var(--panel); }
+.skeleton .sk-img{ aspect-ratio: 16/10; }
+.skeleton .sk-line{ height: 12px; border-radius: 6px; margin: 14px 18px; }
+.skeleton .sk-line.s{ width: 45%; }
+.sk-img, .sk-line{ background: linear-gradient(100deg, #10141c 30%, #1a2130 50%, #10141c 70%); background-size: 240% 100%; animation: shimmer 1.5s linear infinite; }
+@keyframes shimmer{ to{ background-position: -240% 0; } }
+
+/* ==========================================================
+   6 · REVIEW QUEUE
+   ========================================================== */
+.queue{ display: none; margin-bottom: 50px; }
+.queue.on{ display: block; }
+.queue-box{ border: 1px solid rgba(255,176,32,.25); border-radius: var(--r-lg); background: linear-gradient(180deg, rgba(255,176,32,.05), rgba(255,255,255,.012)); padding: clamp(18px, 3vw, 26px); }
+.queue-head{ display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.queue-head h2{ font-family:'Archivo'; font-weight: 800; font-size: 1.3rem; letter-spacing: -.03em; color: var(--amber); }
+.q-item{ display: flex; align-items: center; gap: 14px; padding: 12px; border: 1px solid var(--stroke); border-radius: var(--r-md); background: rgba(5,7,12,.5); margin-bottom: 10px; }
+.q-item img{ width: 62px; height: 62px; object-fit: cover; border-radius: 12px; border: 1px solid var(--stroke); flex: 0 0 auto; background: #0b0e14; }
+.q-info{ flex: 1; min-width: 0; }
+.q-info strong{ display: block; font-weight: 600; }
+.q-info small{ color: var(--faint); font-size: .8rem; }
+.q-acts{ display: flex; gap: 8px; flex-wrap: wrap; }
+.mini{ font: inherit; font-size: .82rem; font-weight: 600; padding: 8px 15px; border-radius: 40px; cursor: pointer; border: 1px solid transparent; transition: all .25s var(--pop); }
+.mini.ok{ background: rgba(59,229,139,.1); color: var(--green); border-color: rgba(59,229,139,.35); }
+.mini.ok:hover{ background: rgba(59,229,139,.22); transform: translateY(-2px); }
+.mini.no{ background: rgba(255,47,109,.1); color: var(--tail); border-color: rgba(255,47,109,.35); }
+.mini.no:hover{ background: rgba(255,47,109,.22); transform: translateY(-2px); }
+@media (max-width: 620px){ .q-item{ flex-wrap: wrap; } .q-acts{ width: 100%; } .mini{ flex: 1; } }
+
+/* ==========================================================
+   7 · UPLOAD DRAWER
+   ========================================================== */
+.veil{ position: fixed; inset: 0; z-index: 500; background: rgba(2,3,6,.75); backdrop-filter: blur(6px); opacity: 0; visibility: hidden; transition: opacity .45s, visibility .45s; }
+.veil.on{ opacity: 1; visibility: visible; }
+.drawer{
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 501; width: min(560px, 100%);
+  background: linear-gradient(180deg, #0b0e15, #07090f);
+  border-left: 1px solid var(--stroke-2); overflow-y: auto; overscroll-behavior: contain;
+  transform: translateX(101%); transition: transform .6s var(--ease);
+  box-shadow: -40px 0 90px rgba(0,0,0,.8);
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.drawer.on{ transform: translateX(0); }
+.drawer-head{
+  position: sticky; top: 0; z-index: 9; display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 20px clamp(18px, 4vw, 28px); background: rgba(8,10,16,.94); backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--stroke);
+}
+.drawer-head h2{ font-family:'Archivo'; font-weight: 800; font-size: 1.25rem; letter-spacing: -.03em; }
+.drawer-head p{ font-size: .8rem; color: var(--faint); margin-top: 1px; }
+.x{
+  width: 38px; height: 38px; border-radius: 50%; flex: 0 0 auto; cursor: pointer; font-family: inherit;
+  background: rgba(255,255,255,.04); border: 1px solid var(--stroke); color: var(--muted);
+  display: grid; place-items: center; transition: all .35s var(--pop);
+}
+.x:hover{ background: rgba(255,47,109,.16); border-color: rgba(255,47,109,.4); color: #ffb3c8; transform: rotate(90deg); }
+.drawer-body{ padding: clamp(18px, 4vw, 28px); }
+
+.field-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.wide{ grid-column: 1/-1; }
+@media (max-width: 560px){ .field-grid{ grid-template-columns: 1fr; } }
+label{ display: block; font-size: .82rem; font-weight: 500; color: var(--muted); margin-bottom: 7px; }
+textarea{ min-height: 96px; resize: vertical; line-height: 1.6; }
+
+.legend{ font-family:'Archivo'; font-weight: 700; font-size: .95rem; margin: 26px 0 14px; display: flex; align-items: center; gap: 10px; color: var(--paint); }
+.legend::after{ content:''; flex: 1; height: 1px; background: var(--stroke); }
+.legend:first-of-type{ margin-top: 0; }
+
+.ac-wrap{ position: relative; }
+.ac-list{
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px);
+  z-index: 40;
+  max-height: 280px; overflow-y: auto;
+  background: rgba(8,10,16,.98); backdrop-filter: blur(20px);
+  border: 1px solid var(--stroke-2); border-radius: 12px;
+  box-shadow: 0 24px 50px -12px rgba(0,0,0,.9);
+  opacity: 0; visibility: hidden; transform: translateY(-6px);
+  transition: opacity .2s var(--ease), transform .2s var(--ease), visibility .2s;
+}
+.ac-list.on{ opacity: 1; visibility: visible; transform: translateY(0); }
+.ac-list::-webkit-scrollbar{ width: 5px; }
+.ac-list::-webkit-scrollbar-thumb{ background: #2a3242; border-radius: 8px; }
+.ac-item{
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  cursor: pointer; transition: background .15s; font-size: .92rem;
+  border-bottom: 1px solid rgba(255,255,255,.03);
+}
+.ac-item:last-child{ border-bottom: none; }
+.ac-item:hover, .ac-item.hl{ background: rgba(56,225,255,.10); }
+.ac-item .ac-name{ flex: 1; min-width: 0; color: var(--paint); }
+.ac-item .ac-name b{ color: var(--xenon); font-weight: 600; }
+.ac-item .ac-meta{ font-size: .74rem; color: var(--faint); font-family:'JetBrains Mono', monospace; white-space: nowrap; }
+.ac-empty{ padding: 12px 14px; color: var(--faint); font-size: .85rem; font-style: italic; }
+
+.specs-card{
+  display: none;
+  margin-top: 12px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: linear-gradient(150deg, rgba(56,225,255,.09), rgba(124,140,255,.05) 60%, rgba(255,47,109,.05));
+  border: 1px solid rgba(56,225,255,.25);
+  position: relative; overflow: hidden;
+  animation: popIn .4s var(--ease);
+}
+.specs-card.on{ display: block; }
+.specs-card::before{
+  content:''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(140deg, rgba(56,225,255,.4), transparent 42%, rgba(255,47,109,.34));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+.specs-head{
+  display: flex; align-items: center; gap: 8px;
+  font-family:'Archivo'; font-weight: 700; font-size: .72rem;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--xenon);
+  margin-bottom: 12px;
+}
+.specs-head::before{ content:'⚙'; font-size: 1rem; }
+.specs-grid{ display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px 16px; }
+.spec-item .spec-l{ font-size: .66rem; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 2px; }
+.spec-item .spec-v{ font-size: .92rem; color: var(--paint); font-weight: 500; }
+.spec-item .spec-v.mono{ font-family:'JetBrains Mono', monospace; font-size: .86rem; }
+
+.color-row{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.color-picker{
+  width: 44px; height: 44px; padding: 3px; border-radius: 12px;
+  background: rgba(5,7,12,.75); border: 1px solid var(--stroke);
+  cursor: pointer; flex: 0 0 auto;
+}
+.color-picker::-webkit-color-swatch-wrapper{ padding: 0; }
+.color-picker::-webkit-color-swatch{ border: none; border-radius: 8px; }
+.color-picker::-moz-color-swatch{ border: none; border-radius: 8px; }
+.swatches{ display: flex; gap: 6px; flex-wrap: wrap; }
+.swatch{
+  width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+  border: 2px solid rgba(255,255,255,.12); transition: all .3s var(--pop);
+}
+.swatch:hover{ transform: scale(1.15); border-color: rgba(255,255,255,.4); }
+.swatch.on{ border-color: var(--xenon); box-shadow: 0 0 0 3px rgba(56,225,255,.25), 0 0 14px rgba(56,225,255,.4); transform: scale(1.1); }
+
+.drop{
+  display: block; border: 1.5px dashed var(--stroke-2); border-radius: var(--r-md); padding: 26px 20px; text-align: center;
+  cursor: pointer; transition: border-color .3s, background .3s, transform .3s var(--pop);
+  background: rgba(255,255,255,.015); margin-bottom: 0;
+}
+.drop:hover, .drop.hot{ border-color: rgba(56,225,255,.6); background: rgba(56,225,255,.06); }
+.drop.hot{ transform: scale(1.01); }
+.drop svg{ margin: 0 auto 10px; display: block; }
+.drop strong{ display: block; font-weight: 600; font-size: .95rem; margin-bottom: 4px; color: var(--paint); }
+.drop span{ font-size: .82rem; color: var(--faint); }
+.drop input{ display: none; }
+
+.check{ margin-top: 18px; border: 1px solid var(--stroke); border-radius: var(--r-md); background: rgba(5,7,12,.6); overflow: hidden; }
+.check.hide{ display: none; }
+.check-head{ display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--stroke); font-size: .88rem; color: var(--muted); }
+.shots{ display: grid; gap: 8px; padding: 12px; }
+.shot{ display: flex; align-items: center; gap: 12px; padding: 9px; border-radius: 12px; background: rgba(255,255,255,.03); border: 1px solid var(--stroke); animation: popIn .4s var(--ease) both; }
+@keyframes popIn{ from{ opacity:0; transform: translateY(8px);} to{ opacity:1; transform: none;} }
+.shot img{ width: 46px; height: 46px; border-radius: 9px; object-fit: cover; background: #0b0e14; flex: 0 0 auto; }
+.shot .meta{ flex: 1; min-width: 0; }
+.shot .fn{ font-size: .85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shot .rd{ font-size: .76rem; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ring{ width: 38px; height: 38px; flex: 0 0 auto; position: relative; }
+.ring svg{ width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .tr{ fill: none; stroke: rgba(255,255,255,.08); stroke-width: 3.5; }
+.ring .fl{ fill: none; stroke: var(--muted); stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 100 100; stroke-dashoffset: 100; transition: stroke-dashoffset .9s var(--ease); }
+.ring b{ position: absolute; inset: 0; display: grid; place-content: center; font-size: .62rem; font-family:'JetBrains Mono', monospace; font-weight: 700; color: var(--faint); }
+.shot.pass .fl{ stroke: var(--green); } .shot.pass .ring b{ color: var(--green); }
+.shot.maybe .fl{ stroke: var(--amber); } .shot.maybe .ring b{ color: var(--amber); }
+.shot.fail .fl{ stroke: var(--tail); } .shot.fail .ring b{ color: var(--tail); }
+.tally{ padding: 0 16px 14px; display: flex; gap: 14px; flex-wrap: wrap; font-size: .8rem; color: var(--muted); }
+.tally i{ font-style: normal; font-family:'JetBrains Mono', monospace; font-weight: 700; }
+.tally .g i{ color: var(--green); } .tally .a i{ color: var(--amber); } .tally .r i{ color: var(--tail); }
+
+.appeal{
+  display: none; width: calc(100% - 24px); margin: 0 12px 12px; padding: 12px;
+  border-radius: 12px; cursor: pointer; font: inherit; font-size: .87rem; font-weight: 600;
+  color: var(--amber); background: rgba(255,176,32,.08); border: 1px solid rgba(255,176,32,.35);
+  transition: all .3s var(--pop);
+}
+.appeal.on{ display: block; }
+.appeal:hover{ background: rgba(255,176,32,.18); transform: translateY(-2px); }
+
+.submit{ width: 100%; margin-top: 22px; padding: 15px 28px; font-size: .98rem; }
+.submit:disabled{ opacity: .55; filter: grayscale(.5); pointer-events: none; }
+
+#status{
+  margin-top: 14px; font-size: .88rem; padding: 12px 16px; border-radius: 12px;
+  border: 1px solid transparent; opacity: 0; transform: translateY(6px);
+  transition: opacity .35s, transform .35s;
+}
+#status.show{ opacity: 1; transform: none; }
+#status.success{ color: #a9f5cd; background: rgba(59,229,139,.1); border-color: rgba(59,229,139,.3); }
+#status.error{ color: #ffb3c8; background: rgba(255,47,109,.1); border-color: rgba(255,47,109,.3); }
+
+/* ==========================================================
+   8 · LIGHTBOX
+   ========================================================== */
+.box{ position: fixed; inset: 0; z-index: 600; background: rgba(2,3,6,.94); backdrop-filter: blur(14px); display: grid; place-items: center; opacity: 0; visibility: hidden; transition: opacity .4s, visibility .4s; padding: clamp(16px, 4vw, 48px); }
+.box.on{ opacity: 1; visibility: visible; }
+.box img{ max-width: 100%; max-height: 80vh; border-radius: var(--r-md); border: 1px solid var(--stroke-2); box-shadow: 0 40px 90px rgba(0,0,0,.9); animation: popIn .45s var(--ease); }
+.box .x{ position: absolute; top: calc(20px + env(safe-area-inset-top,0px)); right: 20px; }
+.box .arrow{ opacity: 1; transform: translateY(-50%); width: 46px; height: 46px; }
+.box .arrow.p{ left: clamp(8px, 3vw, 28px); } .box .arrow.n{ right: clamp(8px, 3vw, 28px); }
+.box-cap{ position: absolute; bottom: calc(22px + env(safe-area-inset-bottom,0px)); left: 50%; transform: translateX(-50%); font-size: .84rem; color: var(--muted); background: rgba(6,8,13,.7); padding: 7px 16px; border-radius: 40px; border: 1px solid var(--stroke); white-space: nowrap; }
+
+/* ==========================================================
+   9 · TOASTS · FOOTER · MISC
+   ========================================================== */
+.toasts{ position: fixed; z-index: 700; left: 50%; transform: translateX(-50%); bottom: calc(22px + env(safe-area-inset-bottom,0px)); display: grid; gap: 10px; width: min(420px, calc(100% - 32px)); pointer-events: none; }
+.toast{
+  display: flex; align-items: center; gap: 11px; padding: 13px 18px; border-radius: 40px; font-size: .88rem; font-weight: 500;
+  background: rgba(13,16,22,.95); border: 1px solid var(--stroke-2); backdrop-filter: blur(16px);
+  box-shadow: 0 20px 50px rgba(0,0,0,.6); animation: toastIn .45s var(--pop);
+}
+.toast.gone{ animation: toastOut .35s var(--ease) forwards; }
+@keyframes toastIn{ from{ opacity:0; transform: translateY(18px) scale(.95);} to{ opacity:1; transform:none;} }
+@keyframes toastOut{ to{ opacity:0; transform: translateY(12px) scale(.96);} }
+.toast .dot{ width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.toast.ok .dot{ background: var(--green); box-shadow: 0 0 10px var(--green); }
+.toast.err .dot{ background: var(--tail); box-shadow: 0 0 10px var(--tail); }
+.toast.info .dot{ background: var(--xenon); box-shadow: 0 0 10px var(--xenon); }
+
+footer{ margin-top: clamp(60px, 10vw, 110px); border-top: 1px solid var(--stroke); padding: 34px 0 44px; }
+.foot-row{ display: flex; gap: 18px; align-items: center; justify-content: space-between; flex-wrap: wrap; color: var(--faint); font-size: .84rem; }
+.foot-row a{ color: var(--muted); text-decoration: none; }
+.foot-row a:hover{ color: var(--xenon); }
+
+.up{
+  position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom,0px)); z-index: 350;
+  width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-family: inherit;
+  background: rgba(13,16,22,.9); border: 1px solid var(--stroke-2); color: var(--paint);
+  display: grid; place-items: center; backdrop-filter: blur(10px);
+  opacity: 0; visibility: hidden; transform: translateY(12px); transition: all .4s var(--pop);
+}
+.up.on{ opacity: 1; visibility: visible; transform: none; }
+.up:hover{ border-color: rgba(56,225,255,.5); color: var(--xenon); }
+
+.reveal{ opacity: 0; transform: translateY(22px); transition: opacity .8s var(--ease), transform .8s var(--ease); }
+.reveal.in{ opacity: 1; transform: none; }
+
+@media (max-width: 760px){
+  .nav{ display: none; }
+  .masthead .btn span.txt{ display: none; }
+  .masthead .btn{ padding: 11px; border-radius: 50%; margin-left: auto; }
+  .arrow{ opacity: 1; transform: translateY(-50%) scale(1); }
+  .scrap{ opacity: 1; transform: scale(1); }
+  .hero-cta .btn{ flex: 1 1 160px; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{ animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+  .ignition{ display: none; }
+  .reveal, .car, .hero-title .line > span{ opacity: 1 !important; transform: none !important; }
+}
+</style>
 </head>
 
 <body>
 
-<div class="container">
-
-    <!-- =====================================
-         HEADER
-    ====================================== -->
-
-    <h1>CarVault</h1>
-
-    <p class="subtitle">
-        Car Photo Upload & Community Database
-    </p>
-
-
-    <!-- =====================================
-         UPLOAD FORM
-    ====================================== -->
-
-    <div class="upload-box">
-
-        <h2>Upload Your Car</h2>
-
-        <form id="carForm">
-
-            <!-- Brand -->
-
-            <label for="brand">
-                Car Brand
-            </label>
-
-            <input
-                type="text"
-                id="brand"
-                placeholder="e.g. BMW"
-                required
-            >
-
-
-            <!-- Model -->
-
-            <label for="model">
-                Car Model
-            </label>
-
-            <input
-                type="text"
-                id="model"
-                placeholder="e.g. M340i"
-                required
-            >
-
-
-            <!-- Year -->
-
-            <label for="year">
-                Year
-            </label>
-
-            <input
-                type="number"
-                id="year"
-                placeholder="e.g. 2020"
-                min="1900"
-                max="2100"
-            >
-
-
-            <!-- Owner -->
-
-            <label for="owner">
-                Owner / Username
-            </label>
-
-            <input
-                type="text"
-                id="owner"
-                placeholder="e.g. Abhi"
-            >
-
-
-            <!-- About -->
-
-            <label for="about">
-                About the car
-            </label>
-
-            <textarea
-                id="about"
-                placeholder="Tell us about this car..."
-            ></textarea>
-
-
-            <!-- Photo -->
-
-            <label for="photo">
-                Car Photo
-            </label>
-
-            <input
-                type="file"
-                id="photo"
-                accept="image/*"
-                required
-            >
-
-
-            <!-- Upload -->
-
-            <button
-                type="submit"
-                id="uploadButton"
-            >
-                Upload Car
-            </button>
-
-
-            <!-- Status -->
-
-            <div id="status"></div>
-
-        </form>
-
+<!-- ===== IGNITION ===== -->
+<div class="ignition" id="ignition">
+  <div class="ignition-inner">
+    <div class="tach">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <defs>
+          <linearGradient id="beamGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#38e1ff"/><stop offset="55%" stop-color="#7c8cff"/><stop offset="100%" stop-color="#ff2f6d"/>
+          </linearGradient>
+        </defs>
+        <circle class="tach-track" cx="100" cy="100" r="75" stroke-dasharray="353 471"/>
+        <circle class="tach-fill" id="tachFill" cx="100" cy="100" r="75" stroke-dasharray="353 471" stroke-dashoffset="353"/>
+        <g class="tach-ticks" id="tachTicks"></g>
+      </svg>
+      <div class="tach-readout">
+        <div class="num mono" id="tachNum">0</div>
+        <div class="lbl">warming up</div>
+      </div>
     </div>
-
-
-    <!-- =====================================
-         UPLOADED CARS
-    ====================================== -->
-
-    <div class="cars-section">
-
-        <h2>Uploaded Cars</h2>
-
-        <div
-            id="carsList"
-            class="cars-grid"
-        >
-
-            <p class="loading">
-                Loading cars...
-            </p>
-
-        </div>
-
-    </div>
-
+    <div class="ignition-word" id="ignitionWord" aria-label="CarVault"></div>
+    <p class="ignition-sub">Every photo is checked on your own device before it reaches the showcase.</p>
+    <button class="skip" id="skipBtn">Skip</button>
+  </div>
 </div>
 
+<div class="scanline" id="scanline"></div>
+
+<!-- ===== HEADER ===== -->
+<header class="masthead" id="masthead">
+  <div class="shell masthead-row">
+    <a class="wordmark" href="#top">
+      <span class="mark">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M3 13.5h18M5.5 13.5l1.7-5.1A2.5 2.5 0 0 1 9.6 6.7h4.8a2.5 2.5 0 0 1 2.4 1.7l1.7 5.1M4 13.5V18h3v-1.7h10V18h3v-4.5" stroke="#38e1ff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span><b>CarVault</b><i>garage index</i></span>
+    </a>
+    <nav class="nav">
+      <a href="#showcase">Showcase</a>
+      <a href="#how">How checking works</a>
+      <a href="#admin" id="adminLink">Review queue</a>
+    </nav>
+    <button class="btn btn-primary" id="openDrawer">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="txt">Add your car</span>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ===== HERO ===== -->
+  <section class="hero">
+    <div class="shell hero-grid">
+      <div>
+        <div class="pill"><span class="led"></span> Photos are checked before they go live</div>
+        <h1 class="hero-title">
+          <span class="line"><span>Park it here.</span></span>
+          <span class="line"><span><em>Nothing but cars</em></span></span>
+          <span class="line"><span>gets through.</span></span>
+        </h1>
+        <p class="hero-copy">
+          CarVault is a showcase for people who photograph their cars properly.
+          Upload a set and a model running <b>on your own device</b> reads every shot,
+          tells you what it sees, and flags anything that isn't a car before a single file is saved.
+        </p>
+        <div class="hero-cta">
+          <button class="btn btn-primary" id="heroUpload">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Add your car
+          </button>
+          <a class="btn btn-ghost" href="#showcase">Browse the garage</a>
+        </div>
+      </div>
+
+      <aside class="cluster">
+        <div class="cluster-inner">
+          <div class="gauges">
+            <div class="gauge"><div class="val mono" id="statCars">0</div><div class="cap">cars</div></div>
+            <div class="gauge"><div class="val mono" id="statShots">0</div><div class="cap">photos</div></div>
+            <div class="gauge"><div class="val mono" id="statBrands">0</div><div class="cap">brands</div></div>
+          </div>
+          <div class="cluster-note" id="how">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7.5 3.2v5.1c0 4.4-3.1 8.4-7.5 9.7-4.4-1.3-7.5-5.3-7.5-9.7V6.2L12 3z" stroke="#38e1ff" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12l2.2 2.2L15.5 10" stroke="#38e1ff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Nothing is sent anywhere to be checked. Shots the model can't read clearly still go up — they wait in the review queue rather than being thrown away.</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="shell"><div class="trails" id="trails" aria-hidden="true"></div></div>
+  </section>
+
+  <!-- ===== REVIEW QUEUE ===== -->
+  <section class="shell queue" id="queue">
+    <div class="queue-box">
+      <div class="queue-head">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8v5M12 16.5h.01M10.3 3.9L2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" stroke="#ffb020" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <h2>Waiting for review</h2>
+      </div>
+      <div id="queueList"></div>
+    </div>
+  </section>
+
+  <!-- ===== SHOWCASE ===== -->
+  <section class="shell reveal" id="showcase">
+    <div class="section-head">
+      <div>
+        <h2>The garage</h2>
+        <p id="fleetCaption">Opening the doors…</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="#7f8aa0" stroke-width="1.8"/><path d="M20 20l-3.5-3.5" stroke="#7f8aa0" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <input type="search" id="searchInput" placeholder="Search brand, model or owner" aria-label="Search cars">
+      </div>
+      <select id="sortSelect" aria-label="Sort cars">
+        <option value="new">Newest first</option>
+        <option value="old">Oldest first</option>
+        <option value="brand">Brand A–Z</option>
+        <option value="year">Newest model year</option>
+      </select>
+      <div class="seg" role="group" aria-label="Layout">
+        <button type="button" class="on" data-view="grid">Grid</button>
+        <button type="button" data-view="list">List</button>
+      </div>
+    </div>
+
+    <div class="fleet" id="fleet"></div>
+  </section>
+
+  <footer>
+    <div class="shell foot-row">
+      <span>CarVault — a place to keep the good shots.</span>
+      <span><a href="#top">Back to top</a></span>
+    </div>
+  </footer>
+</main>
+
+<button class="up" id="toTop" aria-label="Back to top">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</button>
+
+<!-- ===== UPLOAD DRAWER ===== -->
+<div class="veil" id="veil"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <div>
+      <h2>Add your car</h2>
+      <p>Photos are checked before anything is saved</p>
+    </div>
+    <button class="x" id="closeDrawer" aria-label="Close">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <div class="drawer-body">
+    <form id="carForm" autocomplete="off">
+      <div class="legend">The car</div>
+      <div class="field-grid">
+        <div class="ac-wrap">
+          <label for="brand">Brand</label>
+          <input type="text" id="brand" placeholder="BMW" required autocomplete="off" spellcheck="false">
+          <div class="ac-list" id="brandAC" role="listbox"></div>
+        </div>
+        <div class="ac-wrap">
+          <label for="model">Model</label>
+          <input type="text" id="model" placeholder="M340i" required autocomplete="off" spellcheck="false">
+          <div class="ac-list" id="modelAC" role="listbox"></div>
+        </div>
+
+        <!-- NEW: variant / engine autocomplete -->
+        <div class="ac-wrap wide" id="variantWrap" style="display:none;">
+          <label for="variant">Engine / Variant <span style="color:var(--xenon);font-weight:400;text-transform:none;">(optional)</span></label>
+          <input type="text" id="variant" placeholder="e.g. 3.0L Turbo I6 · 382 hp" autocomplete="off" spellcheck="false">
+          <div class="ac-list" id="variantAC" role="listbox"></div>
+        </div>
+
+        <div class="wide">
+          <div class="specs-card" id="specsCard">
+            <div class="specs-head">Detected specs</div>
+            <div class="specs-grid" id="specsGrid"></div>
+          </div>
+        </div>
+
+        <!-- NEW: manual engine inputs (shown when dataset has no specs for the model) -->
+        <div class="wide" id="manualEngineWrap" style="display:none;">
+          <div class="field-grid">
+            <div><label for="engineInput">Engine</label><input type="text" id="engineInput" placeholder="e.g. 3.0L Turbo I6"></div>
+            <div><label for="powerInput">Power</label><input type="text" id="powerInput" placeholder="e.g. 382 hp"></div>
+            <div><label for="torqueInput">Torque</label><input type="text" id="torqueInput" placeholder="e.g. 369 lb-ft"></div>
+            <div><label for="drivetrainInput">Drivetrain</label><input type="text" id="drivetrainInput" placeholder="e.g. RWD / AWD"></div>
+          </div>
+        </div>
+
+        <div><label for="year">Year</label><input type="number" id="year" placeholder="2020" min="1885" max="2100"></div>
+
+        <div>
+          <label for="colorName">Colour</label>
+          <div class="color-row">
+            <input type="color" class="color-picker" id="colorPicker" value="#38e1ff" aria-label="Pick a colour">
+            <div class="swatches" id="swatches"></div>
+          </div>
+          <input type="text" id="colorName" placeholder="e.g. Alpine White" style="margin-top:10px;">
+        </div>
+
+        <div class="wide"><label for="owner">Your name</label><input type="text" id="owner" placeholder="Abhi"></div>
+
+        <div class="wide"><label for="about">What's the story?</label><textarea id="about" placeholder="First car, kept stock apart from the wheels…"></textarea></div>
+
+        <div class="wide"><label for="mods">Modifications <span style="color:var(--xenon); font-weight:400; text-transform:none;">(optional)</span></label><textarea id="mods" placeholder="KW V3 coilovers, 19&quot; BBS CH-R, Stage 2 tune, catback exhaust…"></textarea></div>
+      </div>
+
+      <div class="legend">The photos</div>
+      <label class="drop" id="drop" for="photo">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 16.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1.5M12 15V3m0 0L7.5 7.5M12 3l4.5 4.5" stroke="#38e1ff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <strong>Drop photos here, or choose files</strong>
+        <span>JPG, PNG or WEBP · as many as you like</span>
+        <input type="file" id="photo" accept="image/*" multiple required>
+      </label>
+
+      <div class="check hide" id="check">
+        <div class="check-head"><span class="led"></span><span id="checkText">Reading your photos…</span></div>
+        <div class="shots" id="shots"></div>
+        <div class="tally" id="tally"></div>
+        <button type="button" class="appeal" id="appealBtn">Send these for review instead</button>
+      </div>
+
+      <button type="submit" class="btn btn-primary submit" id="submitBtn">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Publish to the garage
+      </button>
+      <div id="status" role="status"></div>
+    </form>
+  </div>
+</aside>
+
+<!-- ===== LIGHTBOX ===== -->
+<div class="box" id="box" aria-hidden="true">
+  <button class="x" id="boxClose" aria-label="Close viewer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+  <button class="arrow p" id="boxPrev" aria-label="Previous photo">‹</button>
+  <img id="boxImg" src="" alt="">
+  <button class="arrow n" id="boxNext" aria-label="Next photo">›</button>
+  <div class="box-cap" id="boxCap"></div>
+</div>
+
+<div class="toasts" id="toasts"></div>
 
 <script>
+/* ==========================================================
+   SUPABASE
+   ========================================================== */
+const SUPABASE_URL = "https://aprwjgiewmvxslfthncs.supabase.co";
+const SUPABASE_KEY = "sb_publishable_eTj_kJ1dVI6RUSKjCPIp4g_8Tt9VjwA";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // ==================================================
-    // SUPABASE CONFIGURATION
-    // ==================================================
+/* ==========================================================
+   CAR DATASET — loaded from ./models/ folder
+   ========================================================== */
+const CAR_DB = {};
+let ALL_BRANDS = [];
+let datasetReady = false;
+let datasetPromise = null;
+let ENGINES_INDEX = {};   // "Brand||Model" → [engine objects]
 
-    const SUPABASE_URL =
-        "https://aprwjgiewmvxslfthncs.supabase.co";
+async function loadCarDataset(){
+  if (datasetReady) return;
+  if (datasetPromise) return datasetPromise;
 
-    const SUPABASE_KEY =
-        "sb_publishable_eTj_kJ1dVI6RUSKjCPIp4g_8Tt9VjwA";
+  datasetPromise = (async () => {
+    try {
+      console.log("Loading car dataset…");
+      const [brands, autos, engines] = await Promise.all([
+        fetch('./models/brands.json').then(r => { if (!r.ok) throw new Error("brands.json " + r.status); return r.json(); }),
+        fetch('./models/automobiles-trimmed.json').then(r => { if (!r.ok) throw new Error("automobiles-trimmed.json " + r.status); return r.json(); }),
+        fetch('./models/engines-trimmed.json').then(r => { if (!r.ok) throw new Error("engines-trimmed.json " + r.status); return r.json(); })
+      ]);
 
+      console.log("Loaded:", brands.length, "brands,", autos.length, "models,", engines.length, "engines");
 
-    // ==================================================
-    // CREATE SUPABASE CLIENT
-    // ==================================================
+      const brandById = {};
+      brands.forEach(b => {
+        const id = b.id ?? b.brand_id ?? b.ID;
+        const name = b.name ?? b.brand ?? b.title ?? b.Name ?? String(id);
+        if (id != null) brandById[id] = name;
+        if (!CAR_DB[name]) CAR_DB[name] = {};
+      });
 
-    const supabaseClient =
-        supabase.createClient(
-            SUPABASE_URL,
-            SUPABASE_KEY
-        );
+      const modelById = {};
+      autos.forEach(m => {
+        const id = m.id ?? m.model_id ?? m.ID;
+        let brandName = m.brand ?? m.make ?? m.brand_name;
+        if (!brandName && m.brand_id != null) brandName = brandById[m.brand_id];
+        const modelName = m.name ?? m.model ?? m.title ?? m.Name;
+        if (!brandName || !modelName) return;
 
-
-    // ==================================================
-    // GET HTML ELEMENTS
-    // ==================================================
-
-    const form =
-        document.getElementById("carForm");
-
-    const uploadButton =
-        document.getElementById("uploadButton");
-
-    const status =
-        document.getElementById("status");
-
-    const carsList =
-        document.getElementById("carsList");
-
-
-    // ==================================================
-    // ESCAPE HTML
-    // Protects the page from unsafe user text
-    // ==================================================
-
-    function escapeHTML(value) {
-
-        if (
-            value === null ||
-            value === undefined
-        ) {
-            return "";
+        if (!CAR_DB[brandName]) CAR_DB[brandName] = {};
+        if (!CAR_DB[brandName][modelName]) {
+          CAR_DB[brandName][modelName] = {
+            engine: null, power: null, torque: null,
+            zeroTo60: null, drivetrain: null, body: m.body ?? m.body_type ?? null
+          };
         }
+        if (id != null) modelById[id] = { brand: brandName, model: modelName };
+      });
 
-        return String(value)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+      engines.forEach(e => {
+        const modelId = e.model_id ?? e.modelId ?? e.model;
+        const target = modelById[modelId];
+        if (!target) return;
+        const slot = CAR_DB[target.brand]?.[target.model];
+        if (!slot) return;
+
+        if (!slot.engine && (e.engine || e.displacement)) slot.engine = e.engine || e.displacement;
+        if (!slot.power  && (e.power  || e.power_hp || e.horsepower)) slot.power = e.power || e.power_hp || e.horsepower;
+        if (!slot.torque && e.torque) slot.torque = e.torque;
+        if (!slot.zeroTo60 && (e.zeroTo60 || e.acceleration_0_60 || e.zero_to_62)) {
+          slot.zeroTo60 = e.zeroTo60 || e.acceleration_0_60 || e.zero_to_62;
+        }
+        if (!slot.drivetrain && (e.drivetrain || e.drive)) slot.drivetrain = e.drivetrain || e.drive;
+        if (!slot.body && (e.body || e.body_type)) slot.body = e.body || e.body_type;
+      });
+
+      rebuildEnginesIndex(engines, modelById);
+
+      ALL_BRANDS = Object.keys(CAR_DB).sort();
+      datasetReady = true;
+      console.log("CAR_DB ready. Brands:", ALL_BRANDS.length);
+    } catch (err) {
+      console.error("Dataset load failed:", err);
+    }
+  })();
+
+  return datasetPromise;
+}
+
+function rebuildEnginesIndex(engines, modelById){
+  ENGINES_INDEX = {};
+  engines.forEach(e => {
+    const mid = e.model_id ?? e.modelId ?? e.model;
+    const target = modelById[mid];
+    if (!target) return;
+    const key = target.brand + "||" + target.model;
+    if (!ENGINES_INDEX[key]) ENGINES_INDEX[key] = [];
+    ENGINES_INDEX[key].push(e);
+  });
+}
+
+/* ==========================================================
+   HELPERS
+   ========================================================== */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const norm = s => String(s || "").toLowerCase().trim();
+
+function esc(v){
+  if (v === null || v === undefined) return "";
+  return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+}
+
+const toasts = $("#toasts");
+function toast(msg, kind = "info", ms = 3600){
+  const t = document.createElement("div");
+  t.className = "toast " + kind;
+  t.innerHTML = '<span class="dot"></span><span>' + esc(msg) + '</span>';
+  toasts.appendChild(t);
+  setTimeout(() => { t.classList.add("gone"); setTimeout(() => t.remove(), 400); }, ms);
+}
+
+/* ==========================================================
+   IGNITION SEQUENCE
+   ========================================================== */
+(function ignition(){
+  const wrap = $("#ignition"), fill = $("#tachFill"), num = $("#tachNum"), word = $("#ignitionWord");
+
+  let tickSvg = "";
+  for (let i = 0; i <= 10; i++){
+    const a = (i / 10) * 270 * Math.PI / 180;
+    const r1 = 62, r2 = (i % 5 === 0) ? 52 : 57;
+    tickSvg += '<line x1="' + (100 + r1*Math.cos(a)) + '" y1="' + (100 + r1*Math.sin(a)) +
+               '" x2="' + (100 + r2*Math.cos(a)) + '" y2="' + (100 + r2*Math.sin(a)) + '"/>';
+  }
+  $("#tachTicks").innerHTML = tickSvg;
+
+  "CarVault".split("").forEach((ch, i) => {
+    const s = document.createElement("span");
+    s.textContent = ch;
+    s.style.animationDelay = (0.25 + i * 0.045) + "s";
+    word.appendChild(s);
+  });
+
+  let done = false;
+  function finish(){
+    if (done) return;
+    done = true;
+    wrap.classList.add("done");
+    document.body.classList.add("lit");
+    setTimeout(() => wrap.remove(), 1000);
+  }
+  $("#skipBtn").addEventListener("click", finish);
+
+  if (reduceMotion){ finish(); return; }
+
+  const DASH = 353;
+  const start = performance.now(), dur = 2300;
+  (function tick(now){
+    const p = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    fill.style.strokeDashoffset = DASH - DASH * eased;
+    num.textContent = Math.round(eased * 100);
+    if (p < 1) requestAnimationFrame(tick);
+    else setTimeout(finish, 320);
+  })(performance.now());
+})();
+
+/* ==========================================================
+   HEADLIGHT TRAILS
+   ========================================================== */
+(function trails(){
+  const host = $("#trails");
+  if (!host || reduceMotion) return;
+  const tones = ["#38e1ff", "#7c8cff", "#ff2f6d", "#ffffff"];
+  for (let i = 0; i < 14; i++){
+    const t = document.createElement("div");
+    t.className = "trail";
+    const tone = tones[i % tones.length];
+    t.style.top = (6 + Math.random() * 78) + "%";
+    t.style.width = (60 + Math.random() * 220) + "px";
+    t.style.background = "linear-gradient(90deg, transparent, " + tone + ")";
+    t.style.boxShadow = "0 0 12px " + tone;
+    t.style.animationDuration = (2.6 + Math.random() * 3.4) + "s";
+    t.style.animationDelay = (Math.random() * 5) + "s";
+    t.style.opacity = 0.5 + Math.random() * 0.5;
+    host.appendChild(t);
+  }
+})();
+
+/* ==========================================================
+   SCROLL · REVEAL · COUNTERS
+   ========================================================== */
+const masthead = $("#masthead"), scanline = $("#scanline"), toTop = $("#toTop");
+function onScroll(){
+  const y = window.scrollY;
+  const max = document.documentElement.scrollHeight - window.innerHeight;
+  scanline.style.width = (max > 0 ? (y / max) * 100 : 0) + "%";
+  masthead.classList.toggle("stuck", y > 20);
+  toTop.classList.toggle("on", y > 700);
+}
+window.addEventListener("scroll", onScroll, { passive: true });
+onScroll();
+toTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" }));
+
+const revealer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting){ e.target.classList.add("in"); revealer.unobserve(e.target); } });
+}, { threshold: 0.08, rootMargin: "0px 0px -40px 0px" });
+$$(".reveal").forEach(el => revealer.observe(el));
+
+function countTo(el, target){
+  const from = Number(el.dataset.now || 0);
+  el.dataset.now = target;
+  if (reduceMotion || from === target){ el.textContent = target; return; }
+  const t0 = performance.now(), dur = 900;
+  (function step(now){
+    const p = Math.min(1, (now - t0) / dur);
+    el.textContent = Math.round(from + (target - from) * (1 - Math.pow(1 - p, 3)));
+    if (p < 1) requestAnimationFrame(step);
+  })(performance.now());
+}
+
+/* ==========================================================
+   DRAWER
+   ========================================================== */
+const drawer = $("#drawer"), veil = $("#veil"), form = $("#carForm"),
+      submitBtn = $("#submitBtn"), statusEl = $("#status"), photoInput = $("#photo"),
+      check = $("#check"), shots = $("#shots"), tally = $("#tally"),
+      checkText = $("#checkText"), appealBtn = $("#appealBtn");
+
+const SUBMIT_LABEL = '<svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Publish to the garage';
+
+let lastFocus = null;
+function openDrawer(){
+  lastFocus = document.activeElement;
+  drawer.classList.add("on"); veil.classList.add("on");
+  drawer.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+  setTimeout(() => $("#brand").focus(), 420);
+  loadCarDataset();
+}
+function closeDrawer(){
+  drawer.classList.remove("on"); veil.classList.remove("on");
+  drawer.setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+  statusEl.className = ""; statusEl.textContent = "";
+  check.classList.add("hide"); shots.innerHTML = ""; tally.innerHTML = "";
+  appealBtn.classList.remove("on");
+  reviewRequested = false;
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+$("#openDrawer").addEventListener("click", openDrawer);
+$("#heroUpload").addEventListener("click", openDrawer);
+$("#closeDrawer").addEventListener("click", closeDrawer);
+veil.addEventListener("click", closeDrawer);
+
+function setStatus(msg, kind = ""){
+  statusEl.textContent = msg;
+  statusEl.className = kind + " show";
+}
+
+/* ==========================================================
+   AUTOCOMPLETE + SPECS
+   ========================================================== */
+const brandInput = $("#brand"), modelInput = $("#model");
+const brandAC = $("#brandAC"), modelAC = $("#modelAC");
+const variantInput = $("#variant"), variantAC = $("#variantAC"), variantWrap = $("#variantWrap");
+const manualEngineWrap = $("#manualEngineWrap");
+const engineInput = $("#engineInput"), powerInput = $("#powerInput");
+const torqueInput = $("#torqueInput"), drivetrainInput = $("#drivetrainInput");
+const specsCard = $("#specsCard"), specsGrid = $("#specsGrid");
+
+function findBrandKey(value){
+  const q = norm(value);
+  if (!q) return null;
+  let hit = ALL_BRANDS.find(b => norm(b) === q);
+  if (hit) return hit;
+  hit = ALL_BRANDS.find(b => norm(b).startsWith(q));
+  if (hit) return hit;
+  hit = ALL_BRANDS.find(b => norm(b).includes(q));
+  return hit || null;
+}
+
+function findModelKey(brandKey, value){
+  if (!brandKey) return null;
+  const q = norm(value);
+  if (!q) return null;
+  const models = Object.keys(CAR_DB[brandKey] || {});
+  let hit = models.find(m => norm(m) === q);
+  if (hit) return hit;
+  hit = models.find(m => norm(m).startsWith(q));
+  if (hit) return hit;
+  hit = models.find(m => norm(m).includes(q));
+  return hit || null;
+}
+
+let brandHL = -1, brandMatches = [];
+
+function openBrand(matches){
+  brandAC.innerHTML = "";
+  if (!matches.length){
+    brandAC.innerHTML = datasetReady
+      ? '<div class="ac-empty">No matches — keep typing, any brand works.</div>'
+      : '<div class="ac-empty">Loading brand list…</div>';
+  } else {
+    matches.forEach((brand, i) => {
+      const row = document.createElement("div");
+      row.className = "ac-item" + (i === brandHL ? " hl" : "");
+      row.setAttribute("role", "option");
+      const modelCount = CAR_DB[brand] ? Object.keys(CAR_DB[brand]).length : 0;
+      row.innerHTML =
+        '<span class="ac-name"><b>' + esc(brand) + '</b></span>' +
+        '<span class="ac-meta">' + modelCount + ' models</span>';
+      row.addEventListener("mousedown", e => {
+        e.preventDefault();
+        brandInput.value = brand;
+        brandAC.classList.remove("on");
+        brandHL = -1;
+        variantInput.value = "";
+        pickedVariant = null;
+        variantWrap.style.display = "none";
+        manualEngineWrap.style.display = "none";
+        updateModelMatches();
+        modelInput.focus();
+      });
+      brandAC.appendChild(row);
+    });
+  }
+  brandAC.classList.add("on");
+}
+
+brandInput.addEventListener("input", () => {
+  const q = norm(brandInput.value);
+  brandHL = -1;
+  if (!q){
+    brandMatches = ALL_BRANDS.slice(0, 12);
+  } else {
+    const starts = ALL_BRANDS.filter(b => norm(b).startsWith(q));
+    const inc    = ALL_BRANDS.filter(b => !norm(b).startsWith(q) && norm(b).includes(q));
+    brandMatches = starts.concat(inc).slice(0, 12);
+  }
+  variantInput.value = "";
+  pickedVariant = null;
+  variantWrap.style.display = "none";
+  openBrand(brandMatches);
+  updateModelMatches();
+});
+
+brandInput.addEventListener("focus", async () => {
+  await loadCarDataset();
+  const q = norm(brandInput.value);
+  brandMatches = q
+    ? ALL_BRANDS.filter(b => norm(b).includes(q)).slice(0, 12)
+    : ALL_BRANDS.slice(0, 12);
+  openBrand(brandMatches);
+});
+
+brandInput.addEventListener("blur", () => setTimeout(() => brandAC.classList.remove("on"), 140));
+
+brandInput.addEventListener("keydown", e => {
+  const items = $$(".ac-item", brandAC);
+  if (!items.length) return;
+  if (e.key === "ArrowDown"){ e.preventDefault(); brandHL = (brandHL + 1) % items.length; paintBrandHL(items); }
+  else if (e.key === "ArrowUp"){ e.preventDefault(); brandHL = (brandHL - 1 + items.length) % items.length; paintBrandHL(items); }
+  else if (e.key === "Enter" && brandHL >= 0){ e.preventDefault(); items[brandHL].dispatchEvent(new MouseEvent("mousedown")); }
+  else if (e.key === "Escape"){ brandAC.classList.remove("on"); }
+});
+function paintBrandHL(items){
+  items.forEach((el, i) => el.classList.toggle("hl", i === brandHL));
+  if (items[brandHL]) items[brandHL].scrollIntoView({ block: "nearest" });
+}
+
+let modelHL = -1, modelMatches = [];
+
+function updateModelMatches(){
+  const key = findBrandKey(brandInput.value);
+  if (!key){ modelMatches = []; return; }
+  const models = Object.keys(CAR_DB[key] || {});
+  const q = norm(modelInput.value);
+  if (!q){
+    modelMatches = models.slice(0, 12);
+  } else {
+    const starts = models.filter(m => norm(m).startsWith(q));
+    const inc    = models.filter(m => !norm(m).startsWith(q) && norm(m).includes(q));
+    modelMatches = starts.concat(inc).slice(0, 12);
+  }
+}
+
+function openModel(){
+  modelAC.innerHTML = "";
+  const key = findBrandKey(brandInput.value);
+  if (!key){
+    modelAC.innerHTML = '<div class="ac-empty">Pick a brand first, or just type any model.</div>';
+  } else if (!modelMatches.length){
+    modelAC.innerHTML = '<div class="ac-empty">No matches — you can type any model.</div>';
+  } else {
+    modelMatches.forEach((m, i) => {
+      const spec = CAR_DB[key][m] || {};
+      const meta = [spec.engine, spec.power].filter(Boolean).join(' · ') || '—';
+      const row = document.createElement("div");
+      row.className = "ac-item" + (i === modelHL ? " hl" : "");
+      row.setAttribute("role", "option");
+      row.innerHTML =
+        '<span class="ac-name"><b>' + esc(m) + '</b></span>' +
+        '<span class="ac-meta">' + esc(meta) + '</span>';
+      row.addEventListener("mousedown", e => {
+        e.preventDefault();
+        modelInput.value = m;
+        modelAC.classList.remove("on");
+        modelHL = -1;
+        variantInput.value = "";
+        pickedVariant = null;
+        showSpecs(key, m);
+        const spec = CAR_DB[key][m];
+        const hasSpecs = spec && (spec.engine || spec.power || spec.torque || spec.drivetrain);
+        manualEngineWrap.style.display = hasSpecs ? "none" : "";
+        openVariant();
+      });
+      modelAC.appendChild(row);
+    });
+  }
+  modelAC.classList.add("on");
+}
+
+modelInput.addEventListener("input", () => {
+  modelHL = -1;
+  updateModelMatches();
+  openModel();
+  pickedVariant = null;
+  variantInput.value = "";
+  const key = findBrandKey(brandInput.value);
+  if (key){
+    const exact = findModelKey(key, modelInput.value);
+    if (exact){
+      showSpecs(key, exact);
+      const spec = CAR_DB[key][exact];
+      const hasSpecs = spec && (spec.engine || spec.power || spec.torque || spec.drivetrain);
+      manualEngineWrap.style.display = hasSpecs ? "none" : "";
+      if (!hasSpecs){
+        engineInput.value = "";
+        powerInput.value = "";
+        torqueInput.value = "";
+        drivetrainInput.value = "";
+      }
+      openVariant();
+    } else {
+      hideSpecs();
+      variantWrap.style.display = "none";
+      manualEngineWrap.style.display = "";
+    }
+  } else {
+    hideSpecs();
+    variantWrap.style.display = "none";
+    manualEngineWrap.style.display = "";
+  }
+});
+
+modelInput.addEventListener("focus", async () => {
+  await loadCarDataset();
+  updateModelMatches();
+  openModel();
+});
+modelInput.addEventListener("blur", () => setTimeout(() => modelAC.classList.remove("on"), 140));
+
+modelInput.addEventListener("keydown", e => {
+  const items = $$(".ac-item", modelAC);
+  if (!items.length) return;
+  if (e.key === "ArrowDown"){ e.preventDefault(); modelHL = (modelHL + 1) % items.length; paintModelHL(items); }
+  else if (e.key === "ArrowUp"){ e.preventDefault(); modelHL = (modelHL - 1 + items.length) % items.length; paintModelHL(items); }
+  else if (e.key === "Enter" && modelHL >= 0){ e.preventDefault(); items[modelHL].dispatchEvent(new MouseEvent("mousedown")); }
+  else if (e.key === "Escape"){ modelAC.classList.remove("on"); }
+});
+function paintModelHL(items){
+  items.forEach((el, i) => el.classList.toggle("hl", i === modelHL));
+  if (items[modelHL]) items[modelHL].scrollIntoView({ block: "nearest" });
+}
+
+/* ==========================================================
+   VARIANT AUTOCOMPLETE
+   ========================================================== */
+let variantHL = -1, variantMatches = [];
+let pickedVariant = null;
+
+function variantsFor(brandKey, modelKey){
+  return ENGINES_INDEX[brandKey + "||" + modelKey] || [];
+}
+
+function openVariant(){
+  const brandKey = findBrandKey(brandInput.value);
+  const modelKey = findModelKey(brandKey, modelInput.value);
+  if (!brandKey || !modelKey){ variantWrap.style.display = "none"; return; }
+
+  const variants = variantsFor(brandKey, modelKey);
+  if (variants.length <= 1){ variantWrap.style.display = "none"; return; }
+
+  variantWrap.style.display = "";
+
+  variantMatches = variants.map(v => {
+    const bits = [
+      v.engine || v.displacement,
+      v.power || v.power_hp || v.horsepower,
+      v.torque
+    ].filter(Boolean).map(String);
+    return {
+      raw: v,
+      label: bits.join(" · ") || v.name || "variant"
+    };
+  });
+
+  const q = norm(variantInput.value);
+  const filtered = q
+    ? variantMatches.filter(x => norm(x.label).includes(q))
+    : variantMatches;
+
+  variantAC.innerHTML = "";
+  if (!filtered.length){
+    variantAC.innerHTML = '<div class="ac-empty">No matching variants.</div>';
+  } else {
+    filtered.slice(0, 12).forEach((v, i) => {
+      const row = document.createElement("div");
+      row.className = "ac-item" + (i === variantHL ? " hl" : "");
+      row.setAttribute("role", "option");
+      row.innerHTML = '<span class="ac-name"><b>' + esc(v.label) + '</b></span>';
+      row.addEventListener("mousedown", e => {
+        e.preventDefault();
+        variantInput.value = v.label;
+        variantAC.classList.remove("on");
+        variantHL = -1;
+        applyVariant(v.raw);
+      });
+      variantAC.appendChild(row);
+    });
+  }
+  variantAC.classList.add("on");
+}
+
+function applyVariant(raw){
+  pickedVariant = raw;
+  const spec = {
+    engine: raw.engine || raw.displacement || null,
+    power: raw.power || raw.power_hp || raw.horsepower || null,
+    torque: raw.torque || null,
+    zeroTo60: raw.zeroTo60 || raw.acceleration_0_60 || raw.zero_to_62 || null,
+    drivetrain: raw.drivetrain || raw.drive || null,
+    body: raw.body || raw.body_type || null
+  };
+  showSpecsFromObject(spec);
+  manualEngineWrap.style.display = "none";
+}
+
+function showSpecsFromObject(spec){
+  const rows = [];
+  if (spec.engine)     rows.push(['Engine', spec.engine]);
+  if (spec.power)      rows.push(['Power', spec.power]);
+  if (spec.torque)     rows.push(['Torque', spec.torque]);
+  if (spec.zeroTo60)   rows.push(['0–60 mph', spec.zeroTo60, true]);
+  if (spec.drivetrain) rows.push(['Drivetrain', spec.drivetrain]);
+  if (spec.body)       rows.push(['Body', spec.body]);
+  if (!rows.length){ hideSpecs(); return; }
+  specsGrid.innerHTML = rows.map(([l, v, mono]) =>
+    '<div class="spec-item"><div class="spec-l">' + esc(l) + '</div>' +
+    '<div class="spec-v' + (mono ? ' mono' : '') + '">' + esc(v) + '</div></div>'
+  ).join('');
+  specsCard.classList.add("on");
+}
+
+variantInput.addEventListener("input", () => {
+  variantHL = -1;
+  openVariant();
+});
+variantInput.addEventListener("focus", () => {
+  openVariant();
+});
+variantInput.addEventListener("blur", () => setTimeout(() => variantAC.classList.remove("on"), 140));
+variantInput.addEventListener("keydown", e => {
+  const items = $$(".ac-item", variantAC);
+  if (!items.length) return;
+  if (e.key === "ArrowDown"){ e.preventDefault(); variantHL = (variantHL + 1) % items.length; items.forEach((el,i)=>el.classList.toggle("hl", i===variantHL)); if(items[variantHL]) items[variantHL].scrollIntoView({block:"nearest"}); }
+  else if (e.key === "ArrowUp"){ e.preventDefault(); variantHL = (variantHL - 1 + items.length) % items.length; items.forEach((el,i)=>el.classList.toggle("hl", i===variantHL)); if(items[variantHL]) items[variantHL].scrollIntoView({block:"nearest"}); }
+  else if (e.key === "Enter" && variantHL >= 0){ e.preventDefault(); items[variantHL].dispatchEvent(new MouseEvent("mousedown")); }
+  else if (e.key === "Escape"){ variantAC.classList.remove("on"); }
+});
+
+/* ==========================================================
+   SPECS CARD (from base model)
+   ========================================================== */
+function showSpecs(brandKey, modelKey){
+  const spec = CAR_DB[brandKey] && CAR_DB[brandKey][modelKey];
+  if (!spec){ hideSpecs(); return; }
+  showSpecsFromObject(spec);
+}
+function hideSpecs(){
+  specsCard.classList.remove("on");
+  specsGrid.innerHTML = "";
+}
+
+/* ==========================================================
+   COLOUR PICKER
+   ========================================================== */
+const colorPicker = $("#colorPicker"), colorName = $("#colorName"), swatches = $("#swatches");
+const PRESETS = [
+  { name:"Black",  hex:"#0a0a0a" },
+  { name:"White",  hex:"#f5f5f5" },
+  { name:"Silver", hex:"#c0c0c0" },
+  { name:"Grey",   hex:"#7a7a7a" },
+  { name:"Red",    hex:"#d32f2f" },
+  { name:"Blue",   hex:"#1e5fbf" },
+  { name:"Green",  hex:"#2e7d32" },
+  { name:"Yellow", hex:"#f9d71c" },
+  { name:"Orange", hex:"#ef6c00" },
+  { name:"Purple", hex:"#6a1b9a" }
+];
+(function buildSwatches(){
+  PRESETS.forEach(p => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "swatch";
+    b.style.background = p.hex;
+    b.title = p.name;
+    b.dataset.hex = p.hex;
+    b.dataset.name = p.name;
+    b.addEventListener("click", () => {
+      $$(".swatch", swatches).forEach(s => s.classList.remove("on"));
+      b.classList.add("on");
+      colorName.value = p.name;
+      colorPicker.value = p.hex;
+    });
+    swatches.appendChild(b);
+  });
+})();
+colorPicker.addEventListener("input", () => {
+  $$(".swatch", swatches).forEach(s => s.classList.remove("on"));
+});
+
+function colorToHex(str){
+  const s = norm(str);
+  if (!s) return null;
+  const p = PRESETS.find(x => norm(x.name) === s);
+  if (p) return p.hex;
+  const map = { black:"#0a0a0a", white:"#f5f5f5", silver:"#c0c0c0", grey:"#7a7a7a", gray:"#7a7a7a",
+                red:"#d32f2f", blue:"#1e5fbf", green:"#2e7d32", yellow:"#f9d71c",
+                orange:"#ef6c00", purple:"#6a1b9a", gold:"#c9a227", brown:"#6b4423",
+                beige:"#d8c8a8", pink:"#e91e63", maroon:"#800000", navy:"#001f3f" };
+  for (const k in map){ if (s.includes(k)) return map[k]; }
+  return null;
+}
+
+/* drag & drop */
+const drop = $("#drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("hot"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("hot"); }));
+drop.addEventListener("drop", e => {
+  const files = Array.from(e.dataTransfer.files || []).filter(f => f.type.indexOf("image/") === 0);
+  if (!files.length) return;
+  const dt = new DataTransfer();
+  files.forEach(f => dt.items.add(f));
+  photoInput.files = dt.files;
+  photoInput.dispatchEvent(new Event("change"));
+});
+
+/* ==========================================================
+   IN-BROWSER PHOTO CHECK (MobileNet)
+   ========================================================== */
+let model = null, modelLoading = null;
+async function getModel(){
+  if (model) return model;
+  if (modelLoading) return modelLoading;
+  modelLoading = (async () => { model = await mobilenet.load({ version: 2, alpha: 1.0 }); return model; })();
+  return modelLoading;
+}
+
+const CAR_LABELS = [
+  "sports car","convertible","limousine","jeep","cab","minivan","pickup","beach wagon",
+  "moving van","police van","garbage truck","fire engine","ambulance","race car","car wheel",
+  "car mirror","grille","radiator grille","seat belt","minibus","trailer truck","tow truck",
+  "go-kart","snowmobile","half track","model t","streetcar","trolleybus","tractor","harvester",
+  "snowplow","sport utility","suv","landrover","land rover","porsche","ferrari","lamborghini",
+  "audi","bmw","mercedes","tesla","volkswagen","toyota","honda","ford","chevrolet","mustang",
+  "corvette","camaro","wheel","tire","license plate","bumper","hood","fender","headlight",
+  "taillight","windshield","disk brake","gas pump","parking meter"
+];
+function isCarLabel(name){
+  const l = String(name).toLowerCase();
+  return CAR_LABELS.some(label => l.indexOf(label) !== -1 || label.indexOf(l) !== -1);
+}
+
+function fileToImage(file){
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = e => { const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = e.target.result; };
+    fr.onerror = rej;
+    fr.readAsDataURL(file);
+  });
+}
+
+async function inspect(file){
+  const m = await getModel();
+  const img = await fileToImage(file);
+  const preds = await m.classify(img, 5);
+  const top = preds[0] || { className: "something else", probability: 0 };
+  let best = null;
+  preds.forEach(p => { if (isCarLabel(p.className) && (!best || p.probability > best.probability)) best = p; });
+
+  if (best && best.probability >= 0.20)
+    return { verdict:"pass", label: best.className, confidence: best.probability, topLabel: top.className, topConfidence: top.probability };
+  if (best && best.probability >= 0.05)
+    return { verdict:"maybe", label: best.className, confidence: best.probability, topLabel: top.className, topConfidence: top.probability };
+  return { verdict:"fail", label: null, confidence: 0, topLabel: top.className, topConfidence: top.probability };
+}
+
+let results = [];
+let reviewRequested = false;
+
+photoInput.addEventListener("change", async () => {
+  const files = Array.from(photoInput.files || []);
+  results = []; reviewRequested = false;
+  appealBtn.classList.remove("on");
+  tally.innerHTML = "";
+  if (!files.length){ check.classList.add("hide"); return; }
+
+  check.classList.remove("hide");
+  shots.innerHTML = "";
+  checkText.textContent = files.length === 1 ? "Reading your photo…" : "Reading " + files.length + " photos…";
+
+  files.forEach((f, i) => {
+    const row = document.createElement("div");
+    row.className = "shot";
+    row.style.animationDelay = (i * 0.05) + "s";
+    row.innerHTML =
+      '<img alt="">' +
+      '<div class="meta"><div class="fn">' + esc(f.name) + '</div><div class="rd">Waiting…</div></div>' +
+      '<div class="ring"><svg viewBox="0 0 36 36"><circle class="tr" cx="18" cy="18" r="15.9"/><circle class="fl" cx="18" cy="18" r="15.9"/></svg><b>··</b></div>';
+    shots.appendChild(row);
+  });
+
+  const rows = $$(".shot", shots);
+  files.forEach((f, i) => {
+    fileToImage(f).then(img => { if (rows[i]) rows[i].querySelector("img").src = img.src; }).catch(() => {});
+  });
+
+  try { await getModel(); }
+  catch (e){ checkText.textContent = "Couldn't load the checker — you can still publish."; }
+
+  let pass = 0, maybe = 0, fail = 0;
+
+  for (let i = 0; i < files.length; i++){
+    let r;
+    try { r = await inspect(files[i]); }
+    catch (e){ r = { verdict:"maybe", label:null, confidence:0, topLabel:"an unreadable image", topConfidence:0 }; }
+    results.push(Object.assign({ file: files[i] }, r));
+
+    const row = rows[i];
+    if (row){
+      row.classList.add(r.verdict);
+      const rd = row.querySelector(".rd");
+      if (r.verdict === "pass") rd.textContent = "Reads as " + r.label;
+      else if (r.verdict === "maybe") rd.textContent = "Might be " + (r.label || r.topLabel);
+      else rd.textContent = "Reads as " + r.topLabel;
+
+      const pct = Math.round((r.verdict === "fail" ? r.topConfidence : r.confidence) * 100);
+      row.querySelector(".ring b").textContent = r.verdict === "pass" ? String(pct) : (r.verdict === "maybe" ? "?" : "—");
+      const fl = row.querySelector(".fl");
+      requestAnimationFrame(() => { fl.style.strokeDashoffset = 100 - Math.max(6, Math.min(100, pct)); });
     }
 
+    if (r.verdict === "pass") pass++;
+    else if (r.verdict === "maybe") maybe++;
+    else fail++;
+  }
 
-    // ==================================================
-    // LOAD UPLOADED CARS
-    // ==================================================
+  tally.innerHTML =
+    '<span class="g"><i>' + pass + '</i> clearly a car</span>' +
+    '<span class="a"><i>' + maybe + '</i> not sure</span>' +
+    '<span class="r"><i>' + fail + '</i> not a car</span>';
 
-    async function loadCars() {
+  if (fail > 0){
+    checkText.textContent = fail === 1 ? "One photo doesn't look like a car." : fail + " photos don't look like cars.";
+    appealBtn.textContent = "Publish anyway and send for review";
+    appealBtn.classList.add("on");
+  } else if (maybe > 0){
+    checkText.textContent = "A few shots are hard to read — close-ups and odd angles often are.";
+    appealBtn.textContent = "Send these for review";
+    appealBtn.classList.add("on");
+  } else {
+    checkText.textContent = files.length === 1 ? "Looks like a car. Good to go." : "All clear. Good to go.";
+  }
+});
 
-        carsList.innerHTML =
-            '<p class="loading">Loading cars...</p>';
+appealBtn.addEventListener("click", () => {
+  reviewRequested = true;
+  appealBtn.classList.remove("on");
+  checkText.textContent = "These will go to the review queue after publishing.";
+  toast("Queued for review — publish when you're ready", "info");
+});
 
-        try {
+/* ==========================================================
+   PUBLISH
+   ========================================================== */
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-            console.log(
-                "Loading cars from Supabase..."
-            );
+  const brand  = brandInput.value.trim();
+  const model_ = modelInput.value.trim();
+  const year   = $("#year").value;
+  const owner  = $("#owner").value.trim();
+  const about  = $("#about").value.trim();
+  const mods   = $("#mods").value.trim();
+  const color  = colorName.value.trim();
+  const files  = photoInput.files;
 
+  if (!brand || !model_ || !files || files.length === 0){
+    setStatus("Add a brand, a model and at least one photo.", "error"); return;
+  }
+  if (results.length !== files.length){
+    setStatus("Still reading your photos — give it a second.", "error"); return;
+  }
 
-            const {
-                data: cars,
-                error
-            } =
-                await supabaseClient
-                    .from("cars")
-                    .select("*")
-                    .order(
-                        "created_at",
-                        {
-                            ascending: false
-                        }
-                    );
+  const fail  = results.filter(r => r.verdict === "fail").length;
+  const maybe = results.filter(r => r.verdict === "maybe").length;
+  const pending = (fail > 0 || maybe > 0) && reviewRequested;
 
+  if (fail > 0 && !reviewRequested){
+    setStatus(fail + (fail > 1 ? " photos don't" : " photo doesn't") + " look like a car. Remove " + (fail > 1 ? "them" : "it") + ", or send this for review.", "error");
+    return;
+  }
 
-            // ------------------------------------------
-            // CHECK DATABASE ERROR
-            // ------------------------------------------
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="mono">···</span> Uploading';
+  setStatus("Uploading " + files.length + " photo" + (files.length > 1 ? "s" : "") + "…");
 
-            if (error) {
+  try{
+    const urls = [];
+    for (let i = 0; i < files.length; i++){
+      const file = files[i];
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const key = Date.now() + "-" + Math.random().toString(36).slice(2, 10) + "." + ext;
 
-                console.error(
-                    "Supabase cars error:",
-                    error
-                );
+      setStatus("Uploading photo " + (i + 1) + " of " + files.length + "…");
+      const up = await db.storage.from("carvault").upload(key, file, { contentType: file.type, upsert: false });
+      if (up.error) throw up.error;
 
-                throw error;
-            }
-
-
-            console.log(
-                "Cars loaded:",
-                cars
-            );
-
-
-            // ------------------------------------------
-            // NO CARS
-            // ------------------------------------------
-
-            if (
-                !cars ||
-                cars.length === 0
-            ) {
-
-                carsList.innerHTML =
-                    `
-                    <div class="empty">
-                        No cars uploaded yet.
-                    </div>
-                    `;
-
-                return;
-            }
-
-
-            // ------------------------------------------
-            // CLEAR LOADING MESSAGE
-            // ------------------------------------------
-
-            carsList.innerHTML = "";
-
-
-            // ------------------------------------------
-            // CREATE CAR CARDS
-            // ------------------------------------------
-
-            cars.forEach(car => {
-
-                const card =
-                    document.createElement("div");
-
-                card.className =
-                    "car-card";
-
-
-                card.innerHTML = `
-
-                    <img
-                        src="${escapeHTML(
-                            car.image_url
-                        )}"
-                        alt="${escapeHTML(
-                            car.brand
-                        )} ${escapeHTML(
-                            car.model
-                        )}"
-                        loading="lazy"
-                    >
-
-                    <div class="car-info">
-
-                        <h3>
-                            ${escapeHTML(
-                                car.brand
-                            )}
-                            ${escapeHTML(
-                                car.model
-                            )}
-                        </h3>
-
-                        <p>
-                            <strong>
-                                Year:
-                            </strong>
-
-                            ${
-                                car.year ||
-                                "N/A"
-                            }
-                        </p>
-
-                        <p>
-                            <strong>
-                                Owner:
-                            </strong>
-
-                            ${
-                                escapeHTML(
-                                    car.owner ||
-                                    "Anonymous"
-                                )
-                            }
-                        </p>
-
-                        ${
-                            car.about
-                            ?
-                            `
-                            <p class="about">
-                                ${escapeHTML(
-                                    car.about
-                                )}
-                            </p>
-                            `
-                            :
-                            ""
-                        }
-
-                    </div>
-
-                `;
-
-
-                carsList.appendChild(card);
-
-            });
-
-        }
-
-        catch (error) {
-
-            console.error(
-                "CarVault loadCars error:",
-                error
-            );
-
-
-            carsList.innerHTML =
-                `
-                <div class="empty">
-
-                    ❌ Could not load uploaded cars.
-
-                    <br><br>
-
-                    <small>
-                        ${escapeHTML(
-                            error.message ||
-                            "Unknown error"
-                        )}
-                    </small>
-
-                </div>
-                `;
-        }
+      const pub = db.storage.from("carvault").getPublicUrl(key);
+      urls.push(pub.data.publicUrl);
     }
 
-
-    // ==================================================
-    // UPLOAD CAR
-    // ==================================================
-
-    form.addEventListener(
-        "submit",
-        async function(event) {
-
-            event.preventDefault();
-
-
-            // ------------------------------------------
-            // GET FORM VALUES
-            // ------------------------------------------
-
-            const brand =
-                document
-                    .getElementById("brand")
-                    .value
-                    .trim();
-
-            const model =
-                document
-                    .getElementById("model")
-                    .value
-                    .trim();
-
-            const year =
-                document
-                    .getElementById("year")
-                    .value;
-
-            const owner =
-                document
-                    .getElementById("owner")
-                    .value
-                    .trim();
-
-            const about =
-                document
-                    .getElementById("about")
-                    .value
-                    .trim();
-
-            const photo =
-                document
-                    .getElementById("photo")
-                    .files[0];
-
-
-            // ------------------------------------------
-            // VALIDATE
-            // ------------------------------------------
-
-            if (
-                !brand ||
-                !model ||
-                !photo
-            ) {
-
-                status.innerHTML =
-                    "❌ Please fill in the required fields.";
-
-                return;
-            }
-
-
-            // ------------------------------------------
-            // DISABLE BUTTON
-            // ------------------------------------------
-
-            uploadButton.disabled =
-                true;
-
-            uploadButton.textContent =
-                "Uploading...";
-
-            status.innerHTML =
-                "Uploading your car...";
-
-
-            try {
-
-                // ======================================
-                // CREATE UNIQUE FILE NAME
-                // ======================================
-
-                const extension =
-                    photo.name
-                        .split(".")
-                        .pop()
-                        .toLowerCase();
-
-
-                const uniqueName =
-                    Date.now() +
-                    "-" +
-                    Math.random()
-                        .toString(36)
-                        .substring(2, 10);
-
-
-                const fileName =
-                    uniqueName +
-                    "." +
-                    extension;
-
-
-                // ======================================
-                // UPLOAD PHOTO
-                // ======================================
-
-                const {
-                    error: uploadError
-                } =
-                    await supabaseClient
-                        .storage
-                        .from("carvault")
-                        .upload(
-                            fileName,
-                            photo,
-                            {
-                                contentType:
-                                    photo.type,
-
-                                upsert:
-                                    false
-                            }
-                        );
-
-
-                if (uploadError) {
-
-                    throw uploadError;
-                }
-
-
-                // ======================================
-                // GET PUBLIC PHOTO URL
-                // ======================================
-
-                const {
-                    data: publicURLData
-                } =
-                    supabaseClient
-                        .storage
-                        .from("carvault")
-                        .getPublicUrl(
-                            fileName
-                        );
-
-
-                const imageURL =
-                    publicURLData.publicUrl;
-
-
-                // ======================================
-                // SAVE CAR INFORMATION
-                // ======================================
-
-                const {
-                    error: databaseError
-                } =
-                    await supabaseClient
-                        .from("cars")
-                        .insert([
-                            {
-                                brand:
-                                    brand,
-
-                                model:
-                                    model,
-
-                                year:
-                                    year
-                                    ? Number(year)
-                                    : null,
-
-                                owner:
-                                    owner,
-
-                                about:
-                                    about,
-
-                                image_url:
-                                    imageURL
-                            }
-                        ]);
-
-
-                if (databaseError) {
-
-                    throw databaseError;
-                }
-
-
-                // ======================================
-                // SUCCESS
-                // ======================================
-
-                status.innerHTML =
-                    "✅ Car uploaded successfully!";
-
-
-                // Reset form
-
-                form.reset();
-
-
-                // ======================================
-                // REFRESH CAR LIST
-                // ======================================
-
-                await loadCars();
-
-            }
-
-            catch (error) {
-
-                console.error(
-                    "CarVault upload error:",
-                    error
-                );
-
-
-                status.innerHTML =
-                    "❌ Upload failed: " +
-                    escapeHTML(
-                        error.message ||
-                        "Unknown error"
-                    );
-
-            }
-
-            finally {
-
-                uploadButton.disabled =
-                    false;
-
-                uploadButton.textContent =
-                    "Upload Car";
-
-            }
-
-        }
-    );
-
-
-    // ==================================================
-    // LOAD CARS WHEN PAGE OPENS
-    // ==================================================
-
-    loadCars();
-
+    const variantText = variantInput.value.trim();
+    const engineVal  = pickedVariant
+      ? (pickedVariant.engine || pickedVariant.displacement || null)
+      : (engineInput.value.trim() || null);
+    const powerVal   = pickedVariant
+      ? (pickedVariant.power || pickedVariant.power_hp || pickedVariant.horsepower || null)
+      : (powerInput.value.trim() || null);
+    const torqueVal  = pickedVariant
+      ? (pickedVariant.torque || null)
+      : (torqueInput.value.trim() || null);
+    const driveVal   = pickedVariant
+      ? (pickedVariant.drivetrain || pickedVariant.drive || null)
+      : (drivetrainInput.value.trim() || null);
+
+    const payload = {
+      brand: brand,
+      model: model_,
+      year: year ? Number(year) : null,
+      owner: owner,
+      about: about,
+      color: color || null,
+      mods: mods || null,
+      variant: variantText || null,
+      engine: engineVal,
+      power: powerVal,
+      torque: torqueVal,
+      drivetrain: driveVal,
+      image_urls: urls,
+      created_at: new Date().toISOString(),
+      status: pending ? "pending_review" : "approved"
+    };
+
+    let res = await db.from("cars").insert([payload]);
+
+    if (res.error){
+      const m = res.error.message || "";
+      if (/column .* does not exist/i.test(m)){
+        // Fallback without the new fields
+        const fallback = {
+          brand, model: model_,
+          year: year ? Number(year) : null,
+          owner, about,
+          image_urls: urls,
+          created_at: new Date().toISOString()
+        };
+        res = await db.from("cars").insert([fallback]);
+      }
+    }
+    if (res.error) throw res.error;
+
+    if (pending){
+      setStatus("Published — it'll appear once it's been reviewed.", "success");
+      toast("Sent to the review queue", "info");
+    } else {
+      setStatus("Published to the garage.", "success");
+      toast(brand + " " + model_ + " is live", "ok");
+    }
+
+    form.reset();
+    $$(".swatch", swatches).forEach(s => s.classList.remove("on"));
+    hideSpecs();
+    variantWrap.style.display = "none";
+    manualEngineWrap.style.display = "none";
+    pickedVariant = null;
+    check.classList.add("hide"); shots.innerHTML = ""; tally.innerHTML = "";
+    results = []; reviewRequested = false;
+
+    setTimeout(() => { closeDrawer(); loadCars(true); if (adminMode()) loadQueue(); }, 1100);
+
+  } catch (err){
+    console.error(err);
+    setStatus("Upload failed: " + (err.message || "unknown error"), "error");
+    toast("Upload failed", "err");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = SUBMIT_LABEL;
+  }
+});
+
+/* ==========================================================
+   CAROUSEL + POINTER GLOW
+   ========================================================== */
+const carousels = new WeakMap();
+
+function wireStage(card){
+  const frames = $$(".frame", card);
+  const dots = $$(".dots button", card);
+  const bar = $(".bar", card);
+  const prev = $(".arrow.p", card), next = $(".arrow.n", card);
+  if (frames.length <= 1) return;
+
+  let i = 0, timer = null, paused = false;
+  const HOLD = 3400;
+
+  function go(n, restart){
+    i = (n + frames.length) % frames.length;
+    frames.forEach((f, k) => f.classList.toggle("on", k === i));
+    dots.forEach((d, k) => d.classList.toggle("active", k === i));
+    if (restart !== false) run();
+  }
+  function run(){
+    if (bar && !reduceMotion){
+      bar.style.transition = "none"; bar.style.width = "0%";
+      void bar.offsetWidth;
+      bar.style.transition = "width " + HOLD + "ms linear"; bar.style.width = "100%";
+    }
+    clearTimeout(timer);
+    timer = setTimeout(() => { if (paused) run(); else go(i + 1); }, HOLD);
+  }
+
+  dots.forEach((d, k) => d.addEventListener("click", e => { e.stopPropagation(); go(k); }));
+  if (prev) prev.addEventListener("click", e => { e.stopPropagation(); go(i - 1); });
+  if (next) next.addEventListener("click", e => { e.stopPropagation(); go(i + 1); });
+  card.addEventListener("mouseenter", () => { paused = true; });
+  card.addEventListener("mouseleave", () => { paused = false; run(); });
+
+  go(0);
+  carousels.set(card, { stop: () => clearTimeout(timer), index: () => i });
+}
+
+function wireGlow(card){
+  card.addEventListener("pointermove", e => {
+    const r = card.getBoundingClientRect();
+    card.style.setProperty("--mx", ((e.clientX - r.left) / r.width * 100) + "%");
+    card.style.setProperty("--my", ((e.clientY - r.top) / r.height * 100) + "%");
+  });
+}
+
+/* ==========================================================
+   LIGHTBOX
+   ========================================================== */
+const box = $("#box"), boxImg = $("#boxImg"), boxCap = $("#boxCap");
+let boxSet = [], boxIdx = 0, boxTitle = "";
+
+function openBox(images, index, title){
+  if (!images.length) return;
+  boxSet = images; boxIdx = index; boxTitle = title;
+  paintBox();
+  box.classList.add("on"); box.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+}
+function paintBox(){
+  boxImg.src = boxSet[boxIdx];
+  boxImg.alt = boxTitle;
+  boxCap.textContent = boxTitle + " — " + (boxIdx + 1) + " of " + boxSet.length;
+}
+function closeBox(){
+  box.classList.remove("on"); box.setAttribute("aria-hidden", "true");
+  if (!drawer.classList.contains("on")) document.body.style.overflow = "";
+  boxImg.src = "";
+}
+$("#boxClose").addEventListener("click", closeBox);
+$("#boxPrev").addEventListener("click", () => { boxIdx = (boxIdx - 1 + boxSet.length) % boxSet.length; paintBox(); });
+$("#boxNext").addEventListener("click", () => { boxIdx = (boxIdx + 1) % boxSet.length; paintBox(); });
+box.addEventListener("click", e => { if (e.target === box) closeBox(); });
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape"){
+    if (box.classList.contains("on")) closeBox();
+    else if (drawer.classList.contains("on")) closeDrawer();
+  }
+  if (box.classList.contains("on")){
+    if (e.key === "ArrowRight") $("#boxNext").click();
+    if (e.key === "ArrowLeft")  $("#boxPrev").click();
+  }
+});
+
+/* ==========================================================
+   LOAD + RENDER
+   ========================================================== */
+const fleet = $("#fleet"), fleetCaption = $("#fleetCaption");
+const searchInput = $("#searchInput"), sortSelect = $("#sortSelect");
+let allCars = [];
+let view = "grid";
+const adminMode = () => window.location.hash === "#admin";
+
+function skeletons(n){
+  let out = "";
+  for (let i = 0; i < (n || 6); i++){
+    out += '<div class="skeleton"><div class="sk-img"></div><div class="sk-line"></div><div class="sk-line s"></div></div>';
+  }
+  fleet.innerHTML = out;
+}
+
+function imagesOf(car){
+  let imgs = car.image_urls;
+  if (!imgs && car.image_url) imgs = [car.image_url];
+  return Array.isArray(imgs) ? imgs : [];
+}
+
+async function loadCars(scrollToNew){
+  skeletons(6);
+  fleetCaption.textContent = "Opening the doors…";
+  try{
+    const { data, error } = await db.from("cars").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+
+    allCars = (data || []).filter(c => {
+      if (!c.status) return true;
+      if (c.status === "pending_review") return adminMode();
+      return c.status === "approved";
+    });
+
+    const shotsTotal = allCars.reduce((n, c) => n + imagesOf(c).length, 0);
+    const brands = new Set(allCars.map(c => String(c.brand || "").trim().toLowerCase()).filter(Boolean));
+    countTo($("#statCars"), allCars.length);
+    countTo($("#statShots"), shotsTotal);
+    countTo($("#statBrands"), brands.size);
+
+    render(scrollToNew);
+  } catch (err){
+    console.error(err);
+    fleet.innerHTML = '<div class="notice"><h3>The garage didn\'t open</h3><p>' +
+      esc(err.message || "Couldn't reach the database.") +
+      '</p><button class="btn btn-ghost" id="retryLoad">Try again</button></div>';
+    const r = $("#retryLoad"); if (r) r.addEventListener("click", () => loadCars());
+    fleetCaption.textContent = "Couldn't load the garage.";
+  }
+}
+
+function render(scrollToNew){
+  const q = (searchInput.value || "").trim().toLowerCase();
+  let list = allCars.slice();
+
+  if (q) list = list.filter(c => [c.brand, c.model, c.owner, c.about, c.year, c.variant, c.engine].join(" ").toLowerCase().indexOf(q) !== -1);
+
+  const sort = sortSelect.value;
+  if (sort === "old") list.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  else if (sort === "brand") list.sort((a,b) => String(a.brand||"").localeCompare(String(b.brand||"")));
+  else if (sort === "year") list.sort((a,b) => (b.year||0) - (a.year||0));
+  else list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+  fleet.className = "fleet" + (view === "list" ? " list" : "");
+
+  if (!list.length){
+    if (q){
+      fleet.innerHTML = '<div class="notice"><h3>Nothing matches “' + esc(q) + '”</h3><p>Try a different brand or model, or clear the search.</p><button class="btn btn-ghost" id="clearSearch">Clear search</button></div>';
+      const cs = $("#clearSearch"); if (cs) cs.addEventListener("click", () => { searchInput.value = ""; render(); });
+      fleetCaption.textContent = "No matches.";
+    } else {
+      fleet.innerHTML = '<div class="notice"><h3>The garage is empty</h3><p>Be the first to park something here. It takes about a minute.</p><button class="btn btn-primary" id="emptyUpload">Add your car</button></div>';
+      const eu = $("#emptyUpload"); if (eu) eu.addEventListener("click", openDrawer);
+      fleetCaption.textContent = "Nothing parked here yet.";
+    }
+    return;
+  }
+
+  fleetCaption.textContent = list.length + " car" + (list.length !== 1 ? "s" : "") + (q ? " matching your search" : " on show");
+  fleet.innerHTML = "";
+
+  list.forEach((car, idx) => {
+    const imgs = imagesOf(car);
+    const title = ((car.brand || "") + " " + (car.model || "")).trim();
+    const card = document.createElement("article");
+    card.className = "car";
+
+    let stage;
+    if (imgs.length){
+      const frames = imgs.map((u, i) => '<div class="frame' + (i === 0 ? " on" : "") + '"><img src="' + esc(u) + '" alt="' + esc(title) + '" loading="lazy"></div>').join("");
+      const dots = imgs.length > 1 ? '<div class="dots">' + imgs.map((_, i) => '<button type="button" class="' + (i === 0 ? "on" : "") + '" aria-label="Photo ' + (i+1) + '"></button>').join("") + '</div>' : "";
+      const arrows = imgs.length > 1 ? '<button type="button" class="arrow p" aria-label="Previous">‹</button><button type="button" class="arrow n" aria-label="Next">›</button>' : "";
+      const bar = imgs.length > 1 ? '<div class="bar"></div>' : "";
+      const count = imgs.length > 1 ? '<span class="tag count">' + imgs.length + ' photos</span>' : "";
+      stage = '<div class="stage">' + frames + arrows + dots + bar + count + '</div>';
+    } else {
+      stage = '<div class="stage" style="display:grid;place-items:center;color:#2c3444;font-size:1.1rem;">no photo</div>';
+    }
+
+    const held = car.status === "pending_review" ? '<span class="tag hold"><span class="led"></span> In review</span>' : "";
+
+    const created = new Date(car.created_at).getTime();
+    const age = (Date.now() - created) / 1000;
+    const fresh = isFinite(age) && age <= 60;
+    const scrap = fresh
+      ? '<div class="hold-timer mono" data-until="' + (created + 60000) + '">' + Math.max(0, 60 - Math.floor(age)) + 's</div>' +
+        '<button class="scrap" type="button" title="Remove — available for one minute"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>'
+      : "";
+
+    const initial = (String(car.owner || "A").trim().charAt(0) || "A").toUpperCase();
+
+    const colorHTML = car.color
+      ? '<div class="spec-row"><span class="color-chip"><span class="swatch" style="background:' + (colorToHex(car.color) || "#38e1ff") + '"></span>' + esc(car.color) + '</span></div>'
+      : "";
+
+    // NEW: engine / variant chips on the card
+    const engineBits = [];
+    if (car.engine) engineBits.push(car.engine);
+    if (car.power) engineBits.push(car.power);
+    if (car.torque) engineBits.push(car.torque);
+    if (car.drivetrain) engineBits.push(car.drivetrain);
+    const engineHTML = engineBits.length
+      ? '<div class="engine-chip">' + engineBits.map(b => '<span>' + esc(b) + '</span>').join("") + '</div>'
+      : (car.variant ? '<div class="engine-chip"><span>' + esc(car.variant) + '</span></div>' : "");
+
+    const modsHTML = car.mods
+      ? '<div class="mods"><b>Modifications</b>' + esc(car.mods) + '</div>'
+      : "";
+
+    card.innerHTML =
+      stage + held + scrap +
+      '<div class="plate">' +
+        '<div class="plate-top">' +
+          '<h3>' + esc(car.brand) + ' <span>' + esc(car.model) + '</span></h3>' +
+          (car.year ? '<span class="yr mono">' + esc(car.year) + '</span>' : "") +
+        '</div>' +
+        engineHTML +
+        '<div class="owner"><span class="avatar">' + esc(initial) + '</span> ' + esc(car.owner || "Anonymous") + '</div>' +
+        colorHTML +
+        (car.about ? '<p class="about">' + esc(car.about) + '</p>' : "") +
+        modsHTML +
+      '</div>';
+
+    fleet.appendChild(card);
+    wireStage(card);
+    wireGlow(card);
+
+    if (imgs.length){
+      $(".stage", card).addEventListener("click", e => {
+        if (e.target.closest(".arrow") || e.target.closest(".dots") || e.target.closest(".scrap")) return;
+        const c = carousels.get(card);
+        openBox(imgs, c ? c.index() : 0, title || "Photo");
+      });
+    }
+
+    const scrapBtn = $(".scrap", card);
+    if (scrapBtn) scrapBtn.addEventListener("click", e => { e.stopPropagation(); removeCar(car.id, imgs, scrapBtn, title); });
+
+    setTimeout(() => card.classList.add("in"), reduceMotion ? 0 : Math.min(idx, 10) * 55);
+  });
+
+  startHoldTimers();
+
+  if (scrollToNew && fleet.firstElementChild){
+    setTimeout(() => fleet.firstElementChild.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" }), 350);
+  }
+}
+
+let searchDebounce = null;
+searchInput.addEventListener("input", () => { clearTimeout(searchDebounce); searchDebounce = setTimeout(() => render(), 180); });
+sortSelect.addEventListener("change", () => render());
+$$(".seg button").forEach(b => b.addEventListener("click", () => {
+  $$(".seg button").forEach(x => x.classList.remove("on"));
+  b.classList.add("on"); view = b.dataset.view; render();
+}));
+
+let holdTick = null;
+function startHoldTimers(){
+  clearInterval(holdTick);
+  holdTick = setInterval(() => {
+    const timers = $$(".hold-timer");
+    if (!timers.length){ clearInterval(holdTick); return; }
+    timers.forEach(t => {
+      const left = Math.max(0, Math.round((Number(t.dataset.until) - Date.now()) / 1000));
+      if (left <= 0){
+        const card = t.closest(".car");
+        if (card){ const b = $(".scrap", card); if (b) b.remove(); }
+        t.remove();
+      } else {
+        t.textContent = left + "s";
+      }
+    });
+  }, 1000);
+}
+
+async function removeCar(id, imgs, btn, title){
+  if (!confirm("Remove " + (title || "this car") + " and its photos? This can't be undone.")) return;
+  try{
+    btn.disabled = true;
+    btn.innerHTML = '<span class="mono" style="font-size:.66rem">··</span>';
+
+    if (imgs && imgs.length){
+      const keys = imgs.map(u => String(u).split("/").pop()).filter(Boolean);
+      if (keys.length){
+        const del = await db.storage.from("carvault").remove(keys);
+        if (del.error) console.warn(del.error);
+      }
+    }
+    const { error } = await db.from("cars").delete().eq("id", id);
+    if (error) throw error;
+
+    const card = btn.closest(".car");
+    const c = carousels.get(card);
+    if (c) c.stop();
+    card.style.transition = "opacity .35s, transform .35s";
+    card.style.opacity = "0";
+    card.style.transform = "scale(.94)";
+    setTimeout(() => { allCars = allCars.filter(x => x.id !== id); render(); }, 360);
+
+    toast("Removed", "ok");
+  } catch (err){
+    console.error(err);
+    toast("Couldn't remove it: " + (err.message || "unknown error"), "err");
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+  }
+}
+
+/* ==========================================================
+   REVIEW QUEUE
+   ========================================================== */
+const queue = $("#queue"), queueList = $("#queueList");
+
+async function loadQueue(){
+  queueList.innerHTML = '<div class="skeleton" style="height:86px"></div>';
+  try{
+    const { data, error } = await db.from("cars").select("*").eq("status", "pending_review").order("created_at", { ascending: false });
+    if (error) throw error;
+
+    if (!data || !data.length){
+      queueList.innerHTML = '<div class="notice" style="padding:30px 20px"><h3>Nothing waiting</h3><p>Everything uploaded so far passed the check.</p></div>';
+      return;
+    }
+
+    queueList.innerHTML = "";
+    data.forEach(car => {
+      const imgs = imagesOf(car);
+      const row = document.createElement("div");
+      row.className = "q-item";
+      row.innerHTML =
+        '<img src="' + esc(imgs[0] || "") + '" alt="">' +
+        '<div class="q-info"><strong>' + esc(car.brand) + ' ' + esc(car.model) + '</strong>' +
+        '<small>' + esc(car.owner || "Anonymous") + ' · ' + imgs.length + ' photo' + (imgs.length !== 1 ? "s" : "") + '</small></div>' +
+        '<div class="q-acts"><button class="mini ok" type="button">Publish</button><button class="mini no" type="button">Delete</button></div>';
+      queueList.appendChild(row);
+
+      $(".mini.ok", row).addEventListener("click", async () => {
+        await db.from("cars").update({ status: "approved" }).eq("id", car.id);
+        toast(car.brand + " " + car.model + " published", "ok");
+        loadQueue(); loadCars();
+      });
+      $(".mini.no", row).addEventListener("click", async () => {
+        if (!confirm("Delete " + car.brand + " " + car.model + " for good?")) return;
+        const keys = imgs.map(u => String(u).split("/").pop()).filter(Boolean);
+        if (keys.length) await db.storage.from("carvault").remove(keys);
+        await db.from("cars").delete().eq("id", car.id);
+        toast("Deleted", "ok");
+        loadQueue(); loadCars();
+      });
+    });
+  } catch (err){
+    queueList.innerHTML = '<div class="notice" style="padding:30px 20px"><h3>Queue unavailable</h3><p>' + esc(err.message || "") + '</p></div>';
+  }
+}
+
+function syncAdmin(){
+  const on = adminMode();
+  queue.classList.toggle("on", on);
+  $("#adminLink").classList.toggle("on", on);
+  if (on){
+    loadQueue();
+    setTimeout(() => queue.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" }), 120);
+  }
+}
+window.addEventListener("hashchange", () => { syncAdmin(); loadCars(); });
+
+/* ==========================================================
+   START
+   ========================================================== */
+syncAdmin();
+loadCars();
+loadCarDataset();
+setTimeout(() => { getModel().catch(() => {}); }, 2500);
 </script>
-
 </body>
 </html>
