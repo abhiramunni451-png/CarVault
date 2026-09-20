@@ -2,6 +2,7 @@
   "name": "CarVault — Most Wanted",
   "short_name": "CarVault",
   "description": "A garage for the cars that got away. Photos checked on your device.",
+  "id": "/CarVault/",
   "start_url": "/CarVault/",
   "scope": "/CarVault/",
   "display": "standalone",
@@ -13,13 +14,25 @@
       "src": "/CarVault/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/CarVault/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/CarVault/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/CarVault/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
