@@ -1,0 +1,25 @@
+{
+  "name": "CarVault — Most Wanted",
+  "short_name": "CarVault",
+  "description": "A garage for the cars that got away. Photos checked on your device.",
+  "start_url": "/CarVault/",
+  "scope": "/CarVault/",
+  "display": "standalone",
+  "background_color": "#07080a",
+  "theme_color": "#ffaa1a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/CarVault/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/CarVault/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
