@@ -2102,11 +2102,11 @@ photoInput.addEventListener("change", async () => {
 
   if (fail > 0){
     checkText.textContent = fail === 1 ? "One photo doesn't look like a car." : fail + " photos don't look like cars.";
-    appealBtn.textContent = "Publish anyway";
+    appealBtn.textContent = "Send these for review instead";
     appealBtn.classList.add("on");
   } else if (maybe > 0){
     checkText.textContent = "A few shots are hard to read — close-ups and odd angles often are.";
-    appealBtn.textContent = "Publish anyway";
+    appealBtn.textContent = "Send these for review";
     appealBtn.classList.add("on");
   } else {
     checkText.textContent = files.length === 1 ? "Looks like a car. Good to go." : "All clear. Good to go.";
@@ -2116,7 +2116,8 @@ photoInput.addEventListener("change", async () => {
 appealBtn.addEventListener("click", () => {
   reviewRequested = true;
   appealBtn.classList.remove("on");
-  checkText.textContent = "Ready to publish.";
+  checkText.textContent = "These will go to the review queue after publishing.";
+  toast("Queued for review — publish when you're ready", "info");
 });
 
 /* ==========================================================
@@ -2143,14 +2144,16 @@ form.addEventListener("submit", async (e) => {
 
   const fail  = results.filter(r => r.verdict === "fail").length;
   const maybe = results.filter(r => r.verdict === "maybe").length;
+  const pending = (fail > 0 || maybe > 0) && reviewRequested;
 
   if ((fail > 0 || maybe > 0) && !reviewRequested){
     setStatus(
       (fail > 0 ? fail + " photo" + (fail > 1 ? "s" : "") + " don't look like a car. " : "") +
       (maybe > 0 && fail === 0 ? "Some photos are unclear. " : "") +
-      "Tap 'Publish anyway' or swap the photos.",
+      "Remove them, or tap 'Send these for review' to publish anyway.",
       "error"
     );
+    appealBtn.classList.add("on");
     return;
   }
 
@@ -2202,7 +2205,7 @@ form.addEventListener("submit", async (e) => {
       drivetrain: driveVal,
       image_urls: urls,
       created_at: new Date().toISOString(),
-      status: "approved"
+      status: pending ? "pending_review" : "approved"
     };
 
     let res = await db.from("cars").insert([payload]);
@@ -2222,8 +2225,13 @@ form.addEventListener("submit", async (e) => {
     }
     if (res.error) throw res.error;
 
-    setStatus("Published to the garage.", "success");
-    toast(brand + " " + model_ + " is live", "ok");
+    if (pending){
+      setStatus("Published — it'll appear once it's been reviewed.", "success");
+      toast("Sent to the review queue", "info");
+    } else {
+      setStatus("Published to the garage.", "success");
+      toast(brand + " " + model_ + " is live", "ok");
+    }
 
     form.reset();
     $$(".swatch", swatches).forEach(s => s.classList.remove("on"));
